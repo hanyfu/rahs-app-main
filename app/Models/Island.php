@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Island extends Model
 {
@@ -35,19 +34,9 @@ class Island extends Model
         return $this->belongsTo(Profile::class, 'assigned_staff_id');
     }
 
-    public function hospitalProfile(): HasOne
-    {
-        return $this->hasOne(HospitalProfile::class, 'island_id');
-    }
-
     public function hospitalProfiles(): HasMany
     {
         return $this->hasMany(HospitalProfile::class, 'island_id');
-    }
-
-    public function hospitalContacts(): HasMany
-    {
-        return $this->hasMany(HospitalContact::class, 'island_id');
     }
 
     public function tasks(): HasMany

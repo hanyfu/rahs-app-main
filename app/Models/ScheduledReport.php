@@ -29,8 +29,6 @@ class ScheduledReport extends Model
         'is_active' => 'boolean',
     ];
 
-    public const FREQUENCIES = ['daily', 'weekly', 'monthly'];
-
     public function user(): BelongsTo
     {
         return $this->belongsTo(Profile::class, 'user_id');

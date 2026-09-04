@@ -7,6 +7,7 @@ import './pages/important-contacts-admin';
 import './pages/important-contacts';
 import './pages/install';
 import './pages/leaves';
+import './pages/operations';
 import './pages/reports';
 import './pages/role-permissions';
 import './pages/settings';
@@ -277,12 +278,18 @@ window.api = {
         },
         async refresh() {
             try {
+                const previousIds = new Set(this.items.map((item) => item.id));
                 const [data, count] = await Promise.all([
                     window.api.get('/api/notifications'),
                     window.api.get('/api/notifications/unread-count'),
                 ]);
                 this.items = data;
                 this.unread = count.count || 0;
+                if (previousIds.size && window.Notification?.permission === 'granted') {
+                    data.filter((item) => !item.is_read && !previousIds.has(item.id)).slice(0, 3).forEach((item) => {
+                        new Notification(item.title || 'RAHS alert', { body: item.message || 'A new operational alert requires attention.' });
+                    });
+                }
             } catch (e) {
                 /* silent */
             }
@@ -485,37 +492,6 @@ window.api = {
         return createHospitalProfileState(payload.profile || {}, payload.options || {});
     });
 
-    Alpine.data('taskStatusBadge', (status) => ({
-        status,
-        classes() {
-            const map = {
-                pending: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200',
-                in_progress: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200',
-                completed: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200',
-                cancelled: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200',
-            };
-            return map[this.status] || map.pending;
-        },
-        label() {
-            return String(this.status || '').replace('_', ' ');
-        },
-    }));
-
-    Alpine.data('priorityBadge', (priority) => ({
-        priority,
-        classes() {
-            const map = {
-                low: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
-                medium: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-200',
-                high: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-200',
-                urgent: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-200',
-            };
-            return map[this.priority] || map.low;
-        },
-        label() {
-            return String(this.priority || '').replace('_', ' ');
-        },
-    }));
 })();
 
 Alpine.start();
@@ -583,11 +559,17 @@ function enhancePremiumSelect(select) {
     function positionMenu() {
         if (menu.hidden) return;
         const rect = button.getBoundingClientRect();
-        const spaceBelow = window.innerHeight - rect.bottom;
-        const openAbove = spaceBelow < Math.min(320, menu.scrollHeight + 16) && rect.top > spaceBelow;
+        const dialog = select.closest('[role="dialog"]');
+        const boundary = dialog?.getBoundingClientRect();
+        const boundaryTop = Math.max(8, boundary?.top ?? 8);
+        const boundaryBottom = Math.min(window.innerHeight - 8, boundary?.bottom ?? window.innerHeight - 8);
+        const spaceBelow = boundaryBottom - rect.bottom;
+        const spaceAbove = rect.top - boundaryTop;
+        const heightCap = dialog ? 280 : 340;
+        const openAbove = spaceBelow < Math.min(heightCap, menu.scrollHeight + 16) && spaceAbove > spaceBelow;
         menu.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - rect.width - 8))}px`;
         menu.style.width = `${rect.width}px`;
-        menu.style.maxHeight = `${Math.max(180, Math.min(340, openAbove ? rect.top - 12 : spaceBelow - 12))}px`;
+        menu.style.maxHeight = `${Math.max(140, Math.min(heightCap, (openAbove ? spaceAbove : spaceBelow) - 8))}px`;
         menu.style.top = openAbove ? 'auto' : `${rect.bottom + 7}px`;
         menu.style.bottom = openAbove ? `${window.innerHeight - rect.top + 7}px` : 'auto';
         menu.dataset.side = openAbove ? 'top' : 'bottom';
@@ -618,7 +600,7 @@ function enhancePremiumSelect(select) {
             search.className = 'premium-system-select-search';
             search.placeholder = 'Search options…';
             search.value = query;
-            search.addEventListener('input', () => renderOptions(search.value));
+            search.addEventListener('input', () => renderOptions(search.value, true));
             searchWrap.appendChild(search);
             menu.appendChild(searchWrap);
         }
@@ -648,7 +630,11 @@ function enhancePremiumSelect(select) {
         menu.appendChild(list);
         requestAnimationFrame(() => {
             positionMenu();
-            if (searchable && query === '') menu.querySelector('input')?.focus();
+            if (searchable) {
+                const input = menu.querySelector('input');
+                input?.focus();
+                if (query !== '') input?.setSelectionRange(query.length, query.length);
+            }
         });
     }
 
@@ -713,7 +699,12 @@ document.addEventListener('pointerdown', (event) => {
     closePremiumSelect();
 });
 window.addEventListener('resize', () => closePremiumSelect());
-document.addEventListener('scroll', () => closePremiumSelect(), true);
+document.addEventListener('scroll', (event) => {
+    if (activePremiumSelect?.menu.contains(event.target)) {
+        return;
+    }
+    closePremiumSelect();
+}, true);
 
 const dirtyForms = new Set();
 document.addEventListener('input', (event) => {

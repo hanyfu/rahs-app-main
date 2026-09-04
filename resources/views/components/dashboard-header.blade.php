@@ -11,7 +11,7 @@
 <header {{ $attributes->merge(['class' => 'mb-4 lg:mb-8 flex w-full items-center justify-between border-b border-border/50 bg-transparent px-4 py-3 lg:px-8 lg:py-4']) }}>
     <div class="flex items-center gap-3">
         <div class="md:hidden">
-            <button type="button" @click="$store.sidebar.open = true" class="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-all hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Open sidebar">
+            <button type="button" @click="$store.sidebar.open = true" class="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-all hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Open sidebar">
                 <x-icon name="menu" class="h-5 w-5" />
             </button>
         </div>
@@ -40,7 +40,7 @@
         @endif
 
         @if ($onRefresh)
-            <button type="button" @click="{{ $onRefresh }}" class="flex h-9 w-9 items-center justify-center rounded-lg transition-all hover:bg-slate-100 dark:hover:bg-slate-800 md:h-10 md:w-10" aria-label="Refresh">
+            <button type="button" @click="{{ $onRefresh }}" class="flex h-11 w-11 items-center justify-center rounded-lg transition-all hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Refresh">
                 <x-icon name="refresh-cw" class="h-3.5 w-3.5 text-slate-500" />
             </button>
         @endif

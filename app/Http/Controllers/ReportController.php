@@ -10,6 +10,7 @@ use App\Models\Island;
 use App\Models\Profile;
 use App\Models\ScheduledReport;
 use App\Models\Task;
+use App\Services\TaskService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
@@ -19,13 +20,10 @@ class ReportController extends Controller
     public function index(Request $request)
     {
         $role = auth()->user()->role;
-        if (! in_array($role, ['admin', 'supervisor'], true)) {
-            abort(403, 'Access Denied');
-        }
-
         $me = auth()->id();
 
-        $tasks = Task::query()->with(['assignor', 'assignee', 'department', 'island.atoll'])->get();
+        $tasks = (new TaskService)->applyTaskAccess(Task::query(), $role, $me)
+            ->with(['assignor', 'assignee', 'department', 'island.atoll'])->get();
         $profiles = Profile::query()->with('userRole')->get();
         $departments = Department::query()->where('status', 'active')->get();
         $atolls = Atoll::query()->where('status', 'active')->get();
@@ -201,18 +199,8 @@ class ReportController extends Controller
             'priority' => ['nullable', Rule::in(['low', 'medium', 'high', 'urgent'])],
         ]);
 
-        $query = Task::query()->with(['assignor', 'assignee', 'department', 'island.atoll']);
-        if (auth()->user()->role === 'supervisor') {
-            $me = auth()->id();
-            $coordinatorIds = Profile::query()->where('manager_id', $me)->pluck('id');
-            $query->where(function ($scope) use ($me, $coordinatorIds) {
-                $scope->where('assigned_by', $me)
-                    ->orWhere('assigned_to', $me)
-                    ->orWhereIn('assigned_by', $coordinatorIds)
-                    ->orWhereIn('assigned_to', $coordinatorIds)
-                    ->orWhereHas('island.atoll', fn ($atolls) => $atolls->whereIn('coordinator_id', $coordinatorIds));
-            });
-        }
+        $query = (new TaskService)->applyTaskAccess(Task::query(), auth()->user()->role, auth()->id())
+            ->with(['assignor', 'assignee', 'department', 'island.atoll']);
         $query->when($data['date_from'] ?? null, fn ($q, $date) => $q->whereDate('created_at', '>=', $date));
         $query->when($data['date_to'] ?? null, fn ($q, $date) => $q->whereDate('created_at', '<=', $date));
         $query->when($data['island_id'] ?? null, fn ($q, $id) => $q->where('island_id', $id));

@@ -1,15 +1,15 @@
 <script>
-    // The app previously shipped a PWA service worker. It has been retired, but
-    // browsers keep the last registered worker controlling the origin until it
-    // is unregistered here. Run on every layout (including the auth pages) so a
-    // stale worker can never keep intercepting navigation to the login screen.
+    // Remove only retired caching workers. The notification worker deliberately
+    // performs no fetch interception, so it cannot cause stale pages/login loops.
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', async () => {
             const registrations = await navigator.serviceWorker.getRegistrations();
             const cacheNames = 'caches' in window ? await caches.keys() : [];
             const staleCaches = cacheNames.filter((name) => name.startsWith('rahs-cache-'));
 
-            await Promise.all(registrations.map((registration) => registration.unregister()));
+            await Promise.all(registrations
+                .filter((registration) => !registration.active?.scriptURL.endsWith('/push-sw.js'))
+                .map((registration) => registration.unregister()));
             await Promise.all(staleCaches.map((name) => caches.delete(name)));
 
             // Cleanup is intentionally silent. Reloading here used to combine

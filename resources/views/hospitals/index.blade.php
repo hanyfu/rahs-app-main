@@ -3,19 +3,19 @@
 @section('title', 'Hospitals')
 
 @section('content')
-<div x-data='hospitalsPage({ contacts: @json($contacts), atolls: @json($atolls), islands: @json($islands), role: @json($role), editableIslandIds: @json($editableIslandIds->values()), coverage: @json($coverage ?? ['updated' => 0, 'total' => 0, 'missing' => []]), isAdmin: @json($role === 'admin') })' class="max-w-6xl mx-auto">
+<div x-data='hospitalsPage({ contacts: @json($contacts), atolls: @json($atolls), islands: @json($islands), role: @json($role), editableIslandIds: @json($editableIslandIds->values()), coverage: @json($coverage ?? ['updated' => 0, 'total' => 0, 'missing' => []]), canManageHospitals: @json(\App\Models\RolePermission::allows('manage_hospitals')), canEditProfiles: @json(\App\Models\RolePermission::allows('edit_hospital_profiles')) })' class="max-w-6xl mx-auto">
     {{-- Header --}}
     <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
             <h1 class="text-2xl font-bold tracking-tight">Hospital Directory</h1>
             <p class="text-sm text-muted-foreground" x-text="contacts.length + ' facilities'"></p>
         </div>
-        <div class="flex flex-wrap gap-2">
+        <div class="page-header-actions flex w-full flex-wrap gap-2 sm:w-auto">
             <button type="button" @click="exportCsv()" class="gov-btn gov-btn-outline text-sm">
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                 <span class="ml-1.5">Export</span>
             </button>
-            @if ($role === 'admin')
+            @if (\App\Models\RolePermission::allows('manage_hospitals'))
                 <button type="button" @click="importOpen = true" class="gov-btn gov-btn-outline text-sm">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
                     <span class="ml-1.5">Import</span>
@@ -30,18 +30,18 @@
 
     {{-- Filter bar --}}
     <div class="gov-card mb-6 p-3">
-        <div class="flex flex-wrap items-center gap-2">
-            <div class="relative flex-1 min-w-[200px]">
+        <div class="grid grid-cols-1 items-center gap-2 md:grid-cols-[minmax(0,1fr)_11rem_11rem]">
+            <div class="relative min-w-0">
                 <svg class="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                 <input type="search" x-model="filters.search" placeholder="Search hospitals or personnel..." class="h-9 w-full rounded-md border border-border bg-background pl-9 text-sm">
             </div>
-            <select x-model="filters.atoll" @change="filters.island = 'all'" class="h-9 rounded-md border border-border bg-background px-2 text-xs w-36">
+            <select x-model="filters.atoll" @change="filters.island = 'all'" class="h-9 w-full rounded-md border border-border bg-background px-2 text-xs">
                 <option value="all">All Atolls</option>
                 <template x-for="a in atolls" :key="a.id">
                     <option :value="a.id" x-text="a.name"></option>
                 </template>
             </select>
-            <select x-model="filters.island" class="h-9 rounded-md border border-border bg-background px-2 text-xs w-36">
+            <select x-model="filters.island" class="h-9 w-full rounded-md border border-border bg-background px-2 text-xs">
                 <option value="all">All Islands</option>
                 <template x-for="i in islandsForFilter()" :key="i.id">
                     <option :value="i.id" x-text="i.name"></option>
@@ -80,7 +80,7 @@
     @endif
 
     {{-- Table --}}
-    <div class="gov-card overflow-hidden">
+    <div class="gov-card hidden overflow-hidden md:block">
         <div class="overflow-x-auto">
             <table class="w-full text-sm min-w-[820px]">
                 <thead class="bg-muted/50 text-left">
@@ -103,7 +103,7 @@
                 <tbody>
                     <template x-for="c in filteredContacts()" :key="c.id">
                         <tr class="group border-t border-border">
-                            @if ($role === 'admin')
+                            @if (\App\Models\RolePermission::allows('manage_hospitals'))
                                 <td class="px-4 py-3">
                                     <input type="checkbox" class="h-4 w-4 rounded border-border" :checked="selected.has(c.id)" :disabled="c.island_facility" @change="toggleSelect(c.id, $event.target.checked, c.island_facility)">
                                 </td>
@@ -172,10 +172,40 @@
         </div>
     </div>
 
+    {{-- Mobile facility cards --}}
+    <div class="space-y-3 md:hidden">
+        <template x-for="c in filteredContacts()" :key="c.id + '-mobile'">
+            <article class="gov-card overflow-hidden p-4">
+                <div class="flex items-start gap-3">
+                    @if (\App\Models\RolePermission::allows('manage_hospitals'))
+                        <input type="checkbox" class="mt-1 h-5 w-5 shrink-0 rounded border-border" :checked="selected.has(c.id)" :disabled="c.island_facility" @change="toggleSelect(c.id, $event.target.checked, c.island_facility)" :aria-label="`Select ${c.hospital_name}`">
+                    @endif
+                    <button type="button" @click="openProfile(c)" class="min-w-0 flex-1 text-left" :aria-label="`Open hospital profile for ${c.hospital_name}`">
+                        <span class="block truncate text-base font-bold text-foreground" x-text="c.hospital_name"></span>
+                        <span class="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground"><x-icon name="map-pin" class="h-4 w-4 shrink-0" /><span class="truncate" x-text="c.island?.name ? (c.island.name + (c.island?.atoll?.name ? ' · ' + c.island.atoll.name : '')) : 'Location not set'"></span></span>
+                    </button>
+                    <button type="button" @click="openProfile(c)" class="touch-target inline-flex shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary" :aria-label="`View ${c.hospital_name}`"><x-icon name="chevron-right" class="h-5 w-5" /></button>
+                </div>
+                <div class="mt-4 grid grid-cols-2 gap-2 text-sm">
+                    <div class="rounded-xl bg-muted/45 p-3"><span class="block text-xs text-muted-foreground">Manager</span><span class="mt-0.5 block truncate font-semibold" x-text="c.manager_name || 'Not assigned'"></span></div>
+                    <div class="rounded-xl bg-muted/45 p-3"><span class="block text-xs text-muted-foreground">Profile</span><span class="mt-0.5 block truncate font-semibold" x-text="c.profile_preview?.beds ? c.profile_preview.beds + ' beds' : 'Not updated'"></span></div>
+                </div>
+                <div class="mt-3 flex flex-wrap items-center gap-2">
+                    <a :href="'tel:' + c.contact_number" class="gov-btn gov-btn-outline flex-1"><x-icon name="phone" class="h-4 w-4" /><span x-text="c.contact_number || 'No number'"></span></a>
+                    @if ($role === 'admin')
+                        <button x-show="!c.island_facility" type="button" @click="openEdit(c)" class="gov-btn gov-btn-outline btn-icon" :aria-label="`Edit ${c.hospital_name}`"><x-icon name="pencil" class="h-4 w-4" /></button>
+                        <button x-show="!c.island_facility" type="button" @click="deactivate(c)" class="gov-btn gov-btn-outline btn-icon text-destructive" :aria-label="`Deactivate ${c.hospital_name}`"><x-icon name="trash-2" class="h-4 w-4" /></button>
+                    @endif
+                </div>
+            </article>
+        </template>
+        <div x-show="filteredContacts().length === 0" class="gov-card px-5 py-12 text-center text-sm text-muted-foreground" x-text="hasActiveFilters() ? 'No facilities match the current filters' : 'No facilities registered yet'"></div>
+    </div>
+
 {{-- Add / Edit dialog --}}
 <template x-teleport="body">
-<div x-show="showForm" x-cloak class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4" @click.self="showForm = false" role="dialog" aria-modal="true" aria-label="Hospital contact details">
-    <div class="w-full sm:max-w-lg bg-card rounded-t-2xl sm:rounded-xl p-5 sm:p-6">
+<div x-show="showForm" x-cloak class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4" @click.self="showForm = false" @keydown.escape.window="showForm = false" role="dialog" aria-modal="true" aria-label="Hospital contact details">
+    <div class="max-h-[calc(100dvh-0.5rem)] w-full overflow-y-auto overscroll-contain sm:max-w-lg bg-card rounded-t-2xl sm:rounded-xl p-5 sm:p-6">
         <h2 class="text-lg font-bold mb-1" x-text="editing ? 'Edit Contact' : 'Add Contact'"></h2>
         <p class="text-xs text-muted-foreground mb-4">Facility contact details</p>
         <form @submit.prevent="save()" class="space-y-4">
@@ -226,8 +256,8 @@
 
 {{-- Import dialog --}}
 <template x-teleport="body">
-<div x-show="importOpen" x-cloak class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4" @click.self="importOpen = false" role="dialog" aria-modal="true" aria-label="Import hospital contacts">
-    <div class="w-full sm:max-w-lg bg-card rounded-t-2xl sm:rounded-xl p-5 sm:p-6">
+<div x-show="importOpen" x-cloak class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4" @click.self="importOpen = false" @keydown.escape.window="importOpen = false" role="dialog" aria-modal="true" aria-label="Import hospital contacts">
+    <div class="max-h-[calc(100dvh-0.5rem)] w-full overflow-y-auto overscroll-contain sm:max-w-lg bg-card rounded-t-2xl sm:rounded-xl p-5 sm:p-6">
         <h2 class="text-lg font-bold mb-1">Import Contacts</h2>
         <p class="text-sm text-muted-foreground mb-4">Upload a CSV file with hospital contact data.</p>
         <div class="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border p-10 bg-muted/20">
@@ -247,8 +277,8 @@
 
 {{-- Import preview dialog --}}
 <template x-teleport="body">
-<div x-show="showPreview && parsedData.length > 0" x-cloak class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4" @click.self="closePreview()" role="dialog" aria-modal="true" aria-label="Import preview">
-    <div class="w-full sm:max-w-4xl bg-card rounded-t-2xl sm:rounded-xl p-5 sm:p-6 space-y-4">
+<div x-show="showPreview && parsedData.length > 0" x-cloak class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4" @click.self="closePreview()" @keydown.escape.window="closePreview()" role="dialog" aria-modal="true" aria-label="Import preview">
+    <div class="max-h-[calc(100dvh-0.5rem)] w-full overflow-y-auto overscroll-contain sm:max-w-4xl bg-card rounded-t-2xl sm:rounded-xl p-5 sm:p-6 space-y-4">
         <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="flex flex-wrap gap-2">
                 <span class="badge bg-muted text-muted-foreground" x-text="parsedData.length + ' rows found'"></span>
@@ -434,10 +464,29 @@
                         </section>
 
                         <section class="hospital-profile-panel" aria-labelledby="readiness-heading">
-                            <div><p class="text-xs font-bold uppercase tracking-[.16em] text-primary">Readiness</p><h3 id="readiness-heading" class="mt-1 text-lg font-bold">Status overview</h3></div>
-                            <div class="mt-4 space-y-2.5">
+                            <div class="flex items-end justify-between gap-3"><div><p class="text-xs font-bold uppercase tracking-[.16em] text-primary">Readiness</p><h3 id="readiness-heading" class="mt-1 text-lg font-bold">Status overview</h3></div><span class="rounded-full bg-primary/[.07] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.12em] text-primary">6 checks</span></div>
+                            <div class="mt-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-1">
                                 <template x-for="status in statusFields" :key="status.field">
-                                    <div class="flex items-center justify-between gap-3 rounded-xl border border-border/70 px-3.5 py-3"><div class="flex min-w-0 items-center gap-2.5"><span class="h-2.5 w-2.5 shrink-0 rounded-full ring-4" :class="statusTone(profile[status.field]).dot"></span><p class="truncate text-sm font-medium" x-text="status.label"></p></div><select x-show="profileEditing" x-model="profile[status.field]" class="gov-input h-9 min-h-9 w-36 px-2 text-xs font-semibold" :aria-label="status.label"><option value="">Not reported</option><template x-for="option in profileStatusOptions" :key="option"><option :value="option" x-text="option"></option></template></select><span x-show="!profileEditing" class="max-w-[45%] truncate rounded-md px-2 py-1 text-xs font-semibold" :class="statusTone(profile[status.field]).badge" x-text="profile[status.field] || 'Not reported'"></span></div>
+                                    <div class="rounded-2xl bg-muted/30 p-1 ring-1 ring-border/60">
+                                        <div class="rounded-[calc(1rem-0.25rem)] bg-card px-3.5 py-3.5 shadow-[inset_0_1px_0_hsl(var(--background))]">
+                                            <div class="flex min-w-0 items-start justify-between gap-3">
+                                                <div class="flex min-w-0 items-start gap-2.5">
+                                                    <span class="mt-1 h-2.5 w-2.5 shrink-0 rounded-full ring-4" :class="statusTone(profile[status.field]).dot"></span>
+                                                    <p class="text-sm font-semibold leading-5 text-foreground" x-text="status.label"></p>
+                                                </div>
+                                                <span x-show="!profileEditing" class="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold leading-4" :class="statusTone(profile[status.field]).badge" x-text="profile[status.field] || 'Not reported'"></span>
+                                            </div>
+                                            <div x-show="profileEditing" class="mt-3 border-t border-border/50 pt-3">
+                                                <label class="block">
+                                                    <span class="mb-1.5 block text-[10px] font-bold uppercase tracking-[.12em] text-muted-foreground">Current condition</span>
+                                                    <select x-model="profile[status.field]" class="gov-input min-h-11 w-full px-3 text-sm font-semibold" :aria-label="status.label">
+                                                        <option value="">Not reported</option>
+                                                        <template x-for="option in profileStatusOptions" :key="option"><option :value="option" x-text="option"></option></template>
+                                                    </select>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </template>
                             </div>
                         </section>

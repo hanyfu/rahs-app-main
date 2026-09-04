@@ -29,6 +29,112 @@
     class="overflow-hidden relative"
     :class="!compact ? (dashboardStyle ? 'bg-card rounded-2xl border border-border shadow-sm' : 'bg-background/95 backdrop-blur-2xl rounded-2xl sm:rounded-3xl border border-white/10 shadow-2xl') : ''"
 >
+    @if ($dashboardStyle)
+        {{-- Dashboard hospital command card --}}
+        <section class="relative overflow-hidden rounded-[1.75rem] border border-primary/15 bg-primary/[0.045] p-1.5 shadow-[0_24px_70px_-42px_hsl(var(--primary)/0.55)]">
+            <div class="relative overflow-hidden rounded-[calc(1.75rem-0.375rem)] border border-border/70 bg-card">
+                <div class="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-br from-primary/12 via-primary/[0.035] to-transparent"></div>
+                <div class="pointer-events-none absolute -right-12 -top-16 h-44 w-44 rounded-full border-[28px] border-primary/[0.045]"></div>
+
+                <div class="relative p-4 sm:p-6 lg:p-7">
+                    <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                        <div class="flex min-w-0 items-start gap-3.5 sm:gap-4">
+                            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10 text-primary shadow-sm sm:h-14 sm:w-14">
+                                <x-icon name="hospital" class="h-6 w-6 sm:h-7 sm:w-7" />
+                            </div>
+                            <div class="min-w-0 pt-0.5">
+                                <div class="mb-1.5 flex flex-wrap items-center gap-2">
+                                    <span class="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Hospital operations</span>
+                                    <span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/[0.08] px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
+                                        <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                                        Profile active
+                                    </span>
+                                </div>
+                                @if ($hospitalName)
+                                    <h2 class="text-balance text-xl font-bold tracking-[-0.025em] text-foreground sm:text-2xl lg:text-[1.75rem]">{{ $hospitalName }}</h2>
+                                @endif
+                                <div class="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs font-medium text-muted-foreground sm:text-sm">
+                                    <x-icon name="map-pin" class="h-3.5 w-3.5 shrink-0 text-primary" />
+                                    <span>{{ $islandName }}</span>
+                                    @if ($atollName)
+                                        <span class="text-border">/</span>
+                                        <span>{{ $atollName }} Atoll</span>
+                                    @endif
+                                </div>
+                                <template x-if="lastUpdatedLabel()">
+                                    <div class="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                                        <x-icon name="clock" class="h-3 w-3 shrink-0" />
+                                        <span x-text="lastUpdatedLabel()"></span>
+                                        <span x-show="isStale()" class="inline-flex items-center rounded-full border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">Needs update</span>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2 lg:justify-end">
+                            <button type="button" @click="toggleCompact()" :title="compact ? 'Switch to expanded view' : 'Switch to compact view'" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-border/70 bg-background/80 px-3.5 text-xs font-semibold text-muted-foreground shadow-sm transition-[color,background-color,border-color,transform] duration-200 hover:border-primary/20 hover:bg-primary/[0.06] hover:text-foreground active:scale-[0.98] motion-reduce:transition-none">
+                                <x-icon name="layout-grid" class="mr-1.5 h-4 w-4" x-show="compact" />
+                                <x-icon name="list" class="mr-1.5 h-4 w-4" x-show="!compact" x-cloak />
+                                <span x-text="compact ? 'Expand' : 'Compact'"></span>
+                            </button>
+                            @if ($canEdit)
+                                <template x-if="!isEditing">
+                                    <button type="button" @click="enterEdit()" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-[0_10px_24px_-12px_hsl(var(--primary)/0.9)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_28px_-12px_hsl(var(--primary)/0.85)] active:translate-y-0 motion-reduce:transition-none">
+                                        <x-icon name="pencil" class="mr-1.5 h-4 w-4" />
+                                        Edit profile
+                                    </button>
+                                </template>
+                                <template x-if="isEditing">
+                                    <button type="button" @click="cancelEdit()" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-background px-4 text-xs font-semibold text-foreground shadow-sm">
+                                        <x-icon name="x" class="mr-1.5 h-4 w-4" />
+                                        Cancel
+                                    </button>
+                                </template>
+                            @endif
+                            <template x-if="profile.grade">
+                                <div class="inline-flex min-h-11 items-center rounded-xl border border-primary/15 bg-primary/[0.07] px-3.5 text-xs font-bold text-primary" x-text="'Grade ' + profile.grade"></div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="mt-5 grid grid-cols-2 gap-2.5 sm:mt-6 sm:gap-3 lg:grid-cols-4">
+                        <div class="group relative overflow-hidden rounded-2xl border border-border/70 bg-background/75 p-3.5 transition-[border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/25 motion-reduce:transition-none sm:p-4">
+                            <div class="mb-4 flex items-center justify-between">
+                                <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><x-icon name="bed-double" class="h-4 w-4" /></span>
+                                <span class="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Capacity</span>
+                            </div>
+                            <p class="text-2xl font-bold tabular-nums tracking-tight text-foreground sm:text-3xl" x-text="profile.no_of_beds || 0"></p>
+                            <p class="mt-0.5 text-[11px] font-medium text-muted-foreground">Total beds</p>
+                        </div>
+                        <div class="group relative overflow-hidden rounded-2xl border border-border/70 bg-background/75 p-3.5 transition-[border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/25 motion-reduce:transition-none sm:p-4">
+                            <div class="mb-4 flex items-center justify-between">
+                                <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-500/10 text-teal-700 dark:text-teal-400"><x-icon name="users" class="h-4 w-4" /></span>
+                                <span class="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Workforce</span>
+                            </div>
+                            <p class="text-2xl font-bold tabular-nums tracking-tight text-foreground sm:text-3xl" x-text="totalStaff"></p>
+                            <p class="mt-0.5 text-[11px] font-medium text-muted-foreground">Staff members</p>
+                        </div>
+                        <div class="group relative overflow-hidden rounded-2xl border border-border/70 bg-background/75 p-3.5 transition-[border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/25 motion-reduce:transition-none sm:p-4">
+                            <div class="mb-4 flex items-center justify-between">
+                                <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"><x-icon name="activity" class="h-4 w-4" /></span>
+                                <span class="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Coverage</span>
+                            </div>
+                            <p class="text-2xl font-bold tabular-nums tracking-tight text-foreground sm:text-3xl" x-text="activeServices + '/8'"></p>
+                            <p class="mt-0.5 text-[11px] font-medium text-muted-foreground">Active services</p>
+                        </div>
+                        <div class="group relative overflow-hidden rounded-2xl border border-border/70 bg-background/75 p-3.5 transition-[border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/25 motion-reduce:transition-none sm:p-4">
+                            <div class="mb-4 flex items-center justify-between">
+                                <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-700 dark:text-cyan-400"><x-icon name="users" class="h-4 w-4" /></span>
+                                <span class="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Community</span>
+                            </div>
+                            <p class="text-2xl font-bold tabular-nums tracking-tight text-foreground sm:text-3xl" x-text="Number(profile.population || 0).toLocaleString()"></p>
+                            <p class="mt-0.5 text-[11px] font-medium text-muted-foreground">Population served</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    @else
     {{-- Header --}}
     <div class="relative overflow-hidden" :class="!compact ? (dashboardStyle ? 'bg-muted/20 border-b border-border/60' : 'bg-gradient-to-br from-primary via-primary/90 to-primary/80') : ''">
         <div :class="compact ? 'p-0' : 'relative p-4 sm:p-6 md:p-8'">
@@ -129,6 +235,7 @@
             </div>
         </div>
     </div>
+    @endif
 
     {{-- Tabs --}}
     <div x-show="!dashboardStyle" :class="compact ? 'mb-2' : 'bg-muted/20'">
@@ -275,8 +382,8 @@
                         </div>
                         <div class="space-y-1">
                             <template x-for="row in [
-                                { label: 'Clinical Nurses', field: 'nurses_clinical' }, { label: 'Senior Registered', field: 'nurses_senior_registered' },
-                                { label: 'Registered', field: 'nurses_registered' }, { label: 'Enrolled', field: 'nurses_enrolled' },
+                                { label: 'Clinical Nurses', field: 'nurses_clinical' }, { label: 'Senior Registered Nurses', field: 'nurses_senior_registered' },
+                                { label: 'Registered Nurses', field: 'nurses_registered' }, { label: 'Enrolled Nurses', field: 'nurses_enrolled' },
                             ]" :key="row.field">
                                 <div class="group flex items-center gap-3 py-2.5 border-b border-border/30 last:border-0">
                                     <div class="w-8 h-8 rounded-lg bg-muted/30 flex items-center justify-center transition-colors group-hover:bg-pink-500/10">

@@ -27,4 +27,20 @@ class RolePermission extends Model
         'staff_access' => 'boolean',
         'user_access' => 'boolean',
     ];
+
+    public static function allows(string $permissionKey, ?AuthUser $user = null): bool
+    {
+        $user ??= auth()->user();
+        if (! $user) return false;
+        if ($user->role === 'admin') return true;
+
+        $column = match ($user->role) {
+            'supervisor' => 'supervisor_access',
+            'coordinator' => 'coordinator_access',
+            'staff' => 'staff_access',
+            default => 'user_access',
+        };
+
+        return (bool) static::query()->where('permission_key', $permissionKey)->value($column);
+    }
 }

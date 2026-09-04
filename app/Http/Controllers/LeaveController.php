@@ -12,7 +12,6 @@ use App\Services\LeaveService;
 use App\Services\NotificationService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class LeaveController extends Controller
@@ -33,7 +32,7 @@ class LeaveController extends Controller
         $me = auth()->id();
 
         $leavesQuery = CriticalStaffLeave::query()
-            ->with(['coordinator:id,first_name,last_name', 'supervisor:id,first_name,last_name', 'creator:id,first_name,last_name']);
+            ->with(['coordinator:id,first_name,last_name', 'supervisor:id,first_name,last_name', 'creator:id,first_name,last_name', 'hospitalProfile.hospitalContact:id,hospital_name']);
 
         if ($role === 'staff') {
             $leavesQuery->where('created_by', $me);
@@ -46,10 +45,12 @@ class LeaveController extends Controller
         $leaves = $leavesQuery->orderBy('created_at', 'desc')->get();
 
         $profiles = Profile::query()->where('status', 'active')->orderBy('first_name')->get();
-        $setup = CriticalStaffAvailabilitySetup::query()->orderBy('department_unit')->get();
-        $hospitalProfiles = HospitalProfile::query()->get();
+        $setup = $this->availabilitySetups();
+        $hospitalProfiles = $this->accessibleHospitals()->values();
         $hospitalContacts = HospitalContact::query()->where('status', 'active')->orderBy('hospital_name')->get();
         $islands = Island::query()->orderBy('name')->get(['id', 'name']);
+        $staffCategories = $this->leaveService->staffCategories();
+        $staffCategoryFields = $this->leaveService->categoryFieldMap();
 
         $assignees = null;
         if ($role === 'staff') {
@@ -62,7 +63,7 @@ class LeaveController extends Controller
             ];
         }
 
-        return view('leaves.index', compact('leaves', 'profiles', 'setup', 'hospitalProfiles', 'hospitalContacts', 'islands', 'role', 'assignees'));
+        return view('leaves.index', compact('leaves', 'profiles', 'setup', 'hospitalProfiles', 'hospitalContacts', 'islands', 'staffCategories', 'staffCategoryFields', 'role', 'assignees'));
     }
 
     public function data()
@@ -71,7 +72,7 @@ class LeaveController extends Controller
         $me = auth()->id();
 
         $leavesQuery = CriticalStaffLeave::query()
-            ->with(['coordinator:id,first_name,last_name', 'supervisor:id,first_name,last_name', 'creator:id,first_name,last_name']);
+            ->with(['coordinator:id,first_name,last_name', 'supervisor:id,first_name,last_name', 'creator:id,first_name,last_name', 'hospitalProfile.hospitalContact:id,hospital_name']);
 
         if ($role === 'staff') {
             $leavesQuery->where('created_by', $me);
@@ -103,23 +104,43 @@ class LeaveController extends Controller
         $user = auth()->user();
         $data['created_by'] = $user->id;
 
-        if ($user->role === 'staff') {
-            $auto = $this->leaveService->getStaffCoordinatorSupervisor($user->id);
-            $data['assigned_coordinator'] = $auto['coordinator_id'];
-            $data['direct_supervisor'] = $auto['supervisor_id'];
-        }
+        $hospital = HospitalProfile::query()->with(['island.atoll', 'hospitalContact'])->findOrFail($data['hospital_profile_id']);
+        $this->authorizeHospital($hospital);
+        $data['island_id'] = $hospital->island_id;
+        $data['department_unit'] = $hospital->hospitalContact?->hospital_name ?? $hospital->island?->name ?? 'Hospital';
+        $data['assigned_coordinator'] = $hospital->island?->atoll?->coordinator_id;
+        $data['direct_supervisor'] = $hospital->island?->atoll?->supervisor_id;
 
         $leave = CriticalStaffLeave::create($data);
 
         $this->notifications->notifyLeaveCreated($leave);
 
-        return response()->json($leave->load(['coordinator:id,first_name,last_name', 'supervisor:id,first_name,last_name', 'creator:id,first_name,last_name']), 201);
+        return response()->json($leave->load(['coordinator:id,first_name,last_name', 'supervisor:id,first_name,last_name', 'creator:id,first_name,last_name', 'hospitalProfile.hospitalContact:id,hospital_name']), 201);
     }
 
     public function update(Request $request, string $id)
     {
         $leave = CriticalStaffLeave::query()->findOrFail($id);
         $user = auth()->user();
+
+        if (! $this->canManageLeave($leave)) {
+            abort(403);
+        }
+
+        if ($request->keys() === ['approval_status']) {
+            if (! in_array($user->role, ['admin', 'supervisor', 'coordinator'], true)) {
+                abort(403);
+            }
+            $data = $request->validate(['approval_status' => ['required', 'in:submitted,pending_review,approved,rejected,cancelled']]);
+            $statusChanged = $data['approval_status'] !== $leave->approval_status;
+            $leave->update(['approval_status' => $data['approval_status'], 'reviewed_by' => $user->id]);
+            $leave->refresh();
+            if ($statusChanged) {
+                $this->notifications->notifyLeaveUpdated($leave, true);
+            }
+
+            return response()->json($leave->load(['coordinator:id,first_name,last_name', 'supervisor:id,first_name,last_name', 'creator:id,first_name,last_name', 'hospitalProfile.hospitalContact:id,hospital_name']));
+        }
 
         if ($user->role === 'staff') {
             if ($leave->created_by !== $user->id) {
@@ -154,12 +175,16 @@ class LeaveController extends Controller
             $this->notifications->notifyLeaveUpdated($leave, $statusChanged);
         }
 
-        return response()->json($leave->load(['coordinator:id,first_name,last_name', 'supervisor:id,first_name,last_name', 'creator:id,first_name,last_name']));
+        return response()->json($leave->load(['coordinator:id,first_name,last_name', 'supervisor:id,first_name,last_name', 'creator:id,first_name,last_name', 'hospitalProfile.hospitalContact:id,hospital_name']));
     }
 
     public function destroy(string $id)
     {
         $leave = CriticalStaffLeave::query()->findOrFail($id);
+
+        if (! $this->canManageLeave($leave)) {
+            abort(403);
+        }
 
         if (auth()->user()->role === 'staff' && $leave->created_by !== auth()->id()) {
             abort(403);
@@ -176,11 +201,12 @@ class LeaveController extends Controller
 
         $rules = [
             'staff_name' => ['required', 'string', 'max:255'],
-            'staff_id' => ['required', 'string', 'max:255'],
+            'staff_id' => ['nullable', 'string', 'max:255'],
             'staff_category' => ['required', 'string'],
-            'department_unit' => ['required', 'string', 'max:255'],
-            'assigned_coordinator' => [Rule::requiredIf($role !== 'staff'), 'nullable', 'string'],
-            'direct_supervisor' => [Rule::requiredIf($role !== 'staff'), 'nullable', 'string'],
+            'department_unit' => ['nullable', 'string', 'max:255'],
+            'hospital_profile_id' => ['required', 'uuid', 'exists:hospital_profiles,id'],
+            'assigned_coordinator' => ['nullable', 'string'],
+            'direct_supervisor' => ['nullable', 'string'],
             'leave_type' => ['required', 'string'],
             'leave_start_date' => ['required', 'date'],
             'leave_end_date' => ['required', 'date', 'after_or_equal:leave_start_date'],
@@ -197,6 +223,29 @@ class LeaveController extends Controller
 
         $data = $request->validate($rules);
 
+        $hospital = HospitalProfile::query()->with(['island.atoll', 'hospitalContact'])->findOrFail($data['hospital_profile_id']);
+        $this->authorizeHospital($hospital);
+        $data['island_id'] = $hospital->island_id;
+        $data['department_unit'] = $hospital->hospitalContact?->hospital_name ?? $hospital->island?->name ?? 'Hospital';
+        $data['assigned_coordinator'] = $hospital->island?->atoll?->coordinator_id;
+        $data['direct_supervisor'] = $hospital->island?->atoll?->supervisor_id;
+
+        // Staff ID and department are internal continuity fields. They are no
+        // longer requested in the leave form; retain existing values on edits
+        // and otherwise derive them from the signed-in user's profile.
+        $currentProfile = Profile::query()
+            ->with(['department:id,name', 'userDepartment:id,name'])
+            ->find(auth()->id());
+        $data['staff_id'] = $data['staff_id']
+            ?? $existing?->staff_id
+            ?? $currentProfile?->email
+            ?? auth()->id();
+        $data['department_unit'] = $data['department_unit']
+            ?? $existing?->department_unit
+            ?? $currentProfile?->userDepartment?->name
+            ?? $currentProfile?->department?->name
+            ?? 'General';
+
         $criticalLevel = strtolower($data['critical_level'] ?? $existing?->critical_level ?? 'low');
         $urgency = strtolower($data['urgency'] ?? $existing?->urgency ?? 'normal');
         $reason = $data['reason_for_leave'] ?? $existing?->reason_for_leave ?? '';
@@ -207,7 +256,7 @@ class LeaveController extends Controller
 
         $start = Carbon::parse($data['leave_start_date'])->startOfDay();
         $end = Carbon::parse($data['leave_end_date'])->startOfDay();
-        $days = max(1, $end->diffInDays($start) + 1);
+        $days = max(1, (int) $start->diffInDays($end) + 1);
 
         $data['number_of_leave_days'] = $days;
         $data['leave_start_date'] = $start->toDateString();
@@ -236,7 +285,7 @@ class LeaveController extends Controller
 
     public function setupData()
     {
-        return response()->json(CriticalStaffAvailabilitySetup::query()->orderBy('department_unit')->get());
+        return response()->json($this->availabilitySetups());
     }
 
     public function storeSetup(Request $request)
@@ -244,13 +293,24 @@ class LeaveController extends Controller
         $this->assertCanSetup();
 
         $data = $request->validate([
-            'department_unit' => ['required', 'string', 'max:255'],
+            'department_unit' => ['nullable', 'string', 'max:255'],
+            'hospital_profile_id' => ['required', 'uuid', 'exists:hospital_profiles,id'],
             'staff_category' => ['required', 'string'],
             'shift' => ['required', 'string'],
-            'total_active_staff' => ['required', 'integer', 'min:0'],
+            'total_active_staff' => ['nullable', 'integer', 'min:0'],
             'required_minimum_staff' => ['required', 'integer', 'min:0'],
             'coordinator_responsible' => ['nullable', 'string'],
         ]);
+
+        $hospital = HospitalProfile::query()->with(['island.atoll', 'hospitalContact'])->findOrFail($data['hospital_profile_id']);
+        $this->authorizeHospital($hospital);
+        $field = $this->leaveService->categoryFieldMap()[$data['staff_category']] ?? null;
+        if (! $field) {
+            throw ValidationException::withMessages(['staff_category' => 'Choose a staffing category from the hospital profile.']);
+        }
+        $data['department_unit'] = $hospital->hospitalContact?->hospital_name ?? $hospital->island?->name ?? 'Hospital';
+        $data['total_active_staff'] = (int) $hospital->{$field};
+        $data['shift'] = $data['shift'] ?: 'All shifts';
 
         if (auth()->user()->role === 'coordinator' && empty($data['coordinator_responsible'])) {
             $data['coordinator_responsible'] = auth()->id();
@@ -268,6 +328,7 @@ class LeaveController extends Controller
 
         $data = $request->validate([
             'department_unit' => ['nullable', 'string', 'max:255'],
+            'hospital_profile_id' => ['nullable', 'uuid', 'exists:hospital_profiles,id'],
             'staff_category' => ['nullable', 'string'],
             'shift' => ['nullable', 'string'],
             'total_active_staff' => ['nullable', 'integer', 'min:0'],
@@ -275,6 +336,19 @@ class LeaveController extends Controller
             'coordinator_responsible' => ['nullable', 'string'],
             'status' => ['nullable', 'in:active,inactive'],
         ]);
+
+        $hospital = HospitalProfile::query()
+            ->with(['island.atoll', 'hospitalContact'])
+            ->findOrFail($data['hospital_profile_id'] ?? $setup->hospital_profile_id);
+        $this->authorizeHospital($hospital);
+        $category = $data['staff_category'] ?? $setup->staff_category;
+        $field = $this->leaveService->categoryFieldMap()[$category] ?? null;
+        if (! $field) {
+            throw ValidationException::withMessages(['staff_category' => 'Choose a staffing category from the hospital profile.']);
+        }
+        $data['hospital_profile_id'] = $hospital->id;
+        $data['department_unit'] = $hospital->hospitalContact?->hospital_name ?? $hospital->island?->name ?? 'Hospital';
+        $data['total_active_staff'] = (int) $hospital->{$field};
 
         $setup->update($data);
 
@@ -284,7 +358,13 @@ class LeaveController extends Controller
     public function destroySetup(string $id)
     {
         $this->assertCanSetup();
-        CriticalStaffAvailabilitySetup::query()->findOrFail($id)->delete();
+        $setup = CriticalStaffAvailabilitySetup::query()->with('hospitalProfile.island.atoll')->findOrFail($id);
+        if ($setup->hospitalProfile) {
+            $this->authorizeHospital($setup->hospitalProfile);
+        } elseif (auth()->user()->role !== 'admin') {
+            abort(403);
+        }
+        $setup->delete();
 
         return response()->json(['success' => true]);
     }
@@ -294,5 +374,59 @@ class LeaveController extends Controller
         if (! in_array(auth()->user()->role, ['admin', 'supervisor', 'coordinator'], true)) {
             abort(403);
         }
+    }
+
+    private function accessibleHospitals()
+    {
+        $user = auth()->user();
+
+        return HospitalProfile::query()
+            ->with(['hospitalContact:id,hospital_name', 'island.atoll'])
+            ->get()
+            ->filter(fn (HospitalProfile $hospital) => $this->leaveService->userCanAccessHospital($user->id, $user->role, $hospital));
+    }
+
+    private function availabilitySetups()
+    {
+        return CriticalStaffAvailabilitySetup::query()
+            ->with('hospitalProfile.hospitalContact:id,hospital_name')
+            ->orderBy('department_unit')
+            ->get()
+            ->filter(function (CriticalStaffAvailabilitySetup $setup) {
+                if (! $setup->hospitalProfile) {
+                    return true;
+                }
+                $user = auth()->user();
+
+                return $this->leaveService->userCanAccessHospital($user->id, $user->role, $setup->hospitalProfile);
+            })
+            ->each(function (CriticalStaffAvailabilitySetup $setup) {
+                $field = $this->leaveService->categoryFieldMap()[$setup->staff_category] ?? null;
+                if ($field && $setup->hospitalProfile) {
+                    $setup->total_active_staff = (int) $setup->hospitalProfile->{$field};
+                }
+            })
+            ->values();
+    }
+
+    private function authorizeHospital(HospitalProfile $hospital): void
+    {
+        $hospital->loadMissing('island.atoll');
+        $user = auth()->user();
+        abort_unless($this->leaveService->userCanAccessHospital($user->id, $user->role, $hospital), 403);
+    }
+
+    private function canManageLeave(CriticalStaffLeave $leave): bool
+    {
+        $user = auth()->user();
+        if ($user->role === 'admin') {
+            return true;
+        }
+        if ($user->role === 'staff') {
+            return $leave->created_by === $user->id;
+        }
+
+        return ($user->role === 'coordinator' && $leave->assigned_coordinator === $user->id)
+            || ($user->role === 'supervisor' && $leave->direct_supervisor === $user->id);
     }
 }

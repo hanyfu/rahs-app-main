@@ -6,6 +6,7 @@ use App\Models\Atoll;
 use App\Models\AuthUser;
 use App\Models\Island;
 use App\Models\Profile;
+use App\Models\RolePermission;
 use App\Models\Task;
 use App\Models\UserRole;
 use Illuminate\Support\Str;
@@ -169,6 +170,30 @@ class TaskAccessTest extends TestCase
             ])->assertStatus(422);
 
         $this->assertDatabaseMissing('tasks', ['title' => 'Wrong assignee task']);
+    }
+
+    public function test_supervisor_can_create_across_multiple_assigned_atolls_but_not_outside_them(): void
+    {
+        $scope = $this->setupScope();
+        $supervisor = $this->makeUser('supervisor');
+        $scope['atollA']->update(['supervisor_id' => $supervisor->id]);
+        RolePermission::query()->where('permission_key', 'create_tasks')->update(['supervisor_access' => true]);
+
+        $this->actingAs($supervisor)
+            ->postJson('/api/tasks', [
+                'title' => 'Supervised hospital task',
+                'island_id' => $scope['islandA']->id,
+                'assigned_to' => $scope['staff']->id,
+            ])->assertCreated();
+
+        $this->actingAs($supervisor)
+            ->postJson('/api/tasks', [
+                'title' => 'Outside supervisor scope',
+                'island_id' => $scope['islandB']->id,
+                'assigned_to' => $scope['staff2']->id,
+            ])->assertUnprocessable();
+
+        $this->assertDatabaseMissing('tasks', ['title' => 'Outside supervisor scope']);
     }
 
     public function test_staff_only_sees_their_own_and_assigned_tasks(): void

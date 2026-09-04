@@ -10,7 +10,7 @@
                 <div>
                     <p class="text-sm text-muted-foreground">Welcome back,</p>
                     <h1 class="text-xl sm:text-2xl font-bold">{{ $profile?->full_name ?? 'Staff' }}</h1>
-                    <p class="text-sm text-muted-foreground capitalize">{{ auth()->user()->role }}</p>
+                    <p class="text-sm text-muted-foreground capitalize">{{ auth()->user()?->role ?? '' }}</p>
                 </div>
             </div>
 

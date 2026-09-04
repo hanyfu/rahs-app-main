@@ -12,8 +12,38 @@ function settingsPage(props = {}) {
                 password: '',
                 password_confirmation: '',
             },
+            avatarUploading: false,
 
             init() {},
+
+            async uploadAvatar(event) {
+                const file = event.target.files?.[0];
+                if (!file) return;
+
+                if (!file.type.startsWith('image/')) {
+                    Alpine.store('toast').error('Please select an image file');
+                    event.target.value = '';
+                    return;
+                }
+
+                this.avatarUploading = true;
+                try {
+                    const base64 = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(String(reader.result).split(',')[1]);
+                        reader.onerror = reject;
+                        reader.readAsDataURL(file);
+                    });
+                    const data = await window.api.post('/api/upload', { file: base64, filename: file.name });
+                    this.profileForm.avatar_url = data.url;
+                    Alpine.store('toast').success('Avatar uploaded. Save your profile to apply it.');
+                } catch (e) {
+                    Alpine.store('toast').error(e.message || 'Avatar upload failed');
+                } finally {
+                    this.avatarUploading = false;
+                    event.target.value = '';
+                }
+            },
 
             async saveProfile() {
                 try {

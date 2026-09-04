@@ -2,9 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Models\Atoll;
 use App\Models\AuthUser;
 use App\Models\Island;
 use App\Models\Notification;
+use App\Models\RolePermission;
 use App\Models\Task;
 use Tests\TestCase;
 
@@ -12,9 +14,11 @@ class NotificationTest extends TestCase
 {
     public function test_task_creation_notifies_assigned_user(): void
     {
+        RolePermission::where('permission_key', 'create_tasks')->update(['supervisor_access' => true]);
         $supervisor = AuthUser::where('email', 'supervisor@rahs.mv')->first();
         $staff = AuthUser::where('email', 'staff@rahs.mv')->first();
         $island = Island::first();
+        Atoll::where('id', $island->atoll_id)->update(['supervisor_id' => $supervisor->id]);
 
         $this->actingAs($supervisor);
 

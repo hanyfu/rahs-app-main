@@ -177,8 +177,8 @@
     </div>
 
     {{-- Edit dialog --}}
-    <div x-show="isEditDialogOpen" x-cloak class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4" @click.self="isEditDialogOpen = false" role="dialog" aria-modal="true" aria-label="Edit coordinator">
-        <div class="w-full sm:max-w-md bg-card rounded-t-2xl sm:rounded-xl p-5 sm:p-6">
+    <div x-show="isEditDialogOpen" x-cloak class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4" @click.self="isEditDialogOpen = false" @keydown.escape.window="isEditDialogOpen = false" role="dialog" aria-modal="true" aria-label="Edit coordinator">
+        <div class="max-h-[calc(100dvh-0.5rem)] w-full overflow-y-auto overscroll-contain sm:max-w-md bg-card rounded-t-2xl sm:rounded-xl p-5 sm:p-6">
             <h2 class="text-lg font-bold mb-1" x-text="'Edit ' + (editingManager ? roleLabel(editingManager.role) : 'Manager')"></h2>
             <p class="text-sm text-muted-foreground mb-4" x-text="editingManager ? 'Update atoll assignments for ' + editingManager.first_name + ' ' + editingManager.last_name : ''"></p>
             <div class="space-y-4">
@@ -211,8 +211,8 @@
     </div>
 
     {{-- View dialog --}}
-    <div x-show="isViewDialogOpen" x-cloak class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4" @click.self="isViewDialogOpen = false" role="dialog" aria-modal="true" aria-label="Coordinator details">
-        <div class="w-full sm:max-w-lg bg-card rounded-t-2xl sm:rounded-xl p-5 sm:p-6">
+    <div x-show="isViewDialogOpen" x-cloak class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4" @click.self="isViewDialogOpen = false" @keydown.escape.window="isViewDialogOpen = false" role="dialog" aria-modal="true" aria-label="Coordinator details">
+        <div class="max-h-[calc(100dvh-0.5rem)] w-full overflow-y-auto overscroll-contain sm:max-w-lg bg-card rounded-t-2xl sm:rounded-xl p-5 sm:p-6">
             <h2 class="text-lg font-bold mb-4">Manager Profile</h2>
             <template x-if="viewingManager">
                 <div class="space-y-6">
@@ -274,7 +274,7 @@
     </div>
 
     {{-- Deactivate confirmation --}}
-    <div x-show="deleteConfirmId" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" @click.self="deleteConfirmId = null" role="alertdialog" aria-modal="true" aria-label="Delete coordinator">
+    <div x-show="deleteConfirmId" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" @click.self="deleteConfirmId = null" @keydown.escape.window="deleteConfirmId = null" role="alertdialog" aria-modal="true" aria-label="Delete coordinator">
         <div class="w-full sm:max-w-md bg-card rounded-xl p-5 sm:p-6">
             <h2 class="text-lg font-bold mb-1">Deactivate Manager</h2>
             <p class="text-sm text-muted-foreground mb-5">This will remove their role and unassign all atolls. The user will retain their profile but lose access.</p>
@@ -286,4 +286,3 @@
     </div>
 </div>
 @endsection
-

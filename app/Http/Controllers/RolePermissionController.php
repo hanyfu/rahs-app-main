@@ -11,7 +11,7 @@ class RolePermissionController extends Controller
 {
     public function index()
     {
-        $this->authorizeAdminOrSupervisor();
+        $this->authorizeAdmin();
 
         $permissions = RolePermission::query()->orderBy('category')->orderBy('permission_name')->get();
 
@@ -20,7 +20,7 @@ class RolePermissionController extends Controller
 
     public function data()
     {
-        $this->authorizeAdminOrSupervisor();
+        $this->authorizeAdmin();
 
         return response()->json(RolePermission::query()->orderBy('category')->orderBy('permission_name')->get());
     }
@@ -46,7 +46,7 @@ class RolePermissionController extends Controller
         $permission = RolePermission::create([
             'permission_name' => $data['permission_name'],
             'permission_key' => $key,
-            'permission_description' => $data['permission_description'] ?: null,
+            'permission_description' => $data['permission_description'] ?? null,
             'category' => $data['category'],
             'admin_access' => true,
             'supervisor_access' => $data['supervisor_access'] ?? false,
@@ -73,6 +73,10 @@ class RolePermissionController extends Controller
             'user_access' => ['nullable', 'boolean'],
         ]);
 
+        // Administrator access is the recovery path for the access-control
+        // matrix and cannot be disabled by a client request.
+        unset($data['admin_access']);
+
         $permission->update($data);
 
         return response()->json($permission);
@@ -85,9 +89,9 @@ class RolePermissionController extends Controller
         return response()->json(['success' => true]);
     }
 
-    private function authorizeAdminOrSupervisor(): void
+    private function authorizeAdmin(): void
     {
-        if (! in_array(auth()->user()->role, ['admin', 'supervisor'], true)) {
+        if (auth()->user()->role !== 'admin') {
             abort(403, 'Access Denied');
         }
     }

@@ -6,6 +6,7 @@ use App\Models\Atoll;
 use App\Models\CriticalStaffAvailabilitySetup;
 use App\Models\CriticalStaffLeave;
 use App\Models\Island;
+use App\Models\HospitalProfile;
 use App\Models\UserRole;
 
 class LeaveService
@@ -13,6 +14,50 @@ class LeaveService
     public function checkLeaveShortageRisk(CriticalStaffLeave $leave): ?array
     {
         $statuses = ['submitted', 'pending_review', 'approved'];
+
+        if ($leave->hospital_profile_id) {
+            $hospital = HospitalProfile::query()->find($leave->hospital_profile_id);
+            $staffField = $this->categoryFieldMap()[$leave->staff_category] ?? null;
+            if (! $hospital || ! $staffField) {
+                return null;
+            }
+
+            $setup = CriticalStaffAvailabilitySetup::query()
+                ->where('hospital_profile_id', $hospital->id)
+                ->where('staff_category', $leave->staff_category)
+                ->where('status', 'active')
+                ->where(fn ($query) => $query
+                    ->where('shift', $leave->shift_affected ?: 'All shifts')
+                    ->orWhere('shift', 'All shifts'))
+                ->orderByRaw('CASE WHEN shift = ? THEN 0 ELSE 1 END', [$leave->shift_affected ?: 'All shifts'])
+                ->first();
+
+            if (! $setup) {
+                return null;
+            }
+
+            $onLeave = CriticalStaffLeave::query()
+                ->where('hospital_profile_id', $hospital->id)
+                ->where('staff_category', $leave->staff_category)
+                ->whereIn('approval_status', $statuses)
+                ->where('leave_start_date', '<=', $leave->leave_end_date)
+                ->where('leave_end_date', '>=', $leave->leave_start_date)
+                ->when($setup->shift !== 'All shifts', fn ($query) => $query->where('shift_affected', $setup->shift))
+                ->count();
+
+            $total = max(0, (int) $hospital->{$staffField});
+            $remaining = max(0, $total - $onLeave);
+
+            return [
+                'setup' => $setup,
+                'hospital' => $hospital,
+                'total' => $total,
+                'onLeave' => $onLeave,
+                'tempReplacementOut' => 0,
+                'remaining' => $remaining,
+                'shortage' => $remaining < (int) $setup->required_minimum_staff,
+            ];
+        }
 
         $setup = CriticalStaffAvailabilitySetup::query()
             ->where('department_unit', $leave->department_unit)
@@ -104,9 +149,9 @@ class LeaveService
             'Medical Officer' => 'staff_medical_officer',
             'Psychiatrist' => 'staff_psychiatrist',
             'Clinical Nurses' => 'nurses_clinical',
-            'Senior Registered' => 'nurses_senior_registered',
-            'Registered' => 'nurses_registered',
-            'Enrolled' => 'nurses_enrolled',
+            'Senior Registered Nurses' => 'nurses_senior_registered',
+            'Registered Nurses' => 'nurses_registered',
+            'Enrolled Nurses' => 'nurses_enrolled',
             'Senior Admin' => 'admin_officers_senior',
             'Admin Officers' => 'admin_officers',
             'Customer Service' => 'customer_service',
@@ -119,5 +164,31 @@ class LeaveService
     public function staffCategories(): array
     {
         return array_keys($this->categoryFieldMap());
+    }
+
+    public function userCanAccessHospital(string $userId, string $role, HospitalProfile $hospital): bool
+    {
+        if ($role === 'admin') {
+            return true;
+        }
+
+        $island = $hospital->island;
+        if (! $island) {
+            return false;
+        }
+
+        if ($role === 'staff') {
+            return $island->assigned_staff_id === $userId;
+        }
+
+        if ($role === 'coordinator') {
+            return $island->atoll?->coordinator_id === $userId;
+        }
+
+        if ($role === 'supervisor') {
+            return $island->atoll?->supervisor_id === $userId;
+        }
+
+        return false;
     }
 }

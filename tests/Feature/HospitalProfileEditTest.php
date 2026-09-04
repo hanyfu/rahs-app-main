@@ -3,15 +3,27 @@
 namespace Tests\Feature;
 
 use App\Models\AuthUser;
+use App\Models\Atoll;
 use App\Models\HospitalContact;
 use App\Models\Island;
 use App\Models\Profile;
+use App\Models\RolePermission;
 use App\Models\UserRole;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class HospitalProfileEditTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        RolePermission::where('permission_key', 'edit_hospital_profiles')->update([
+            'supervisor_access' => true,
+            'coordinator_access' => true,
+            'staff_access' => true,
+        ]);
+    }
+
     private function makeStaffUser(): AuthUser
     {
         $user = AuthUser::create([
@@ -32,7 +44,7 @@ class HospitalProfileEditTest extends TestCase
         return $user;
     }
 
-    public function test_staff_without_assignment_can_save_standalone_profile(): void
+    public function test_staff_without_assignment_cannot_save_a_profile(): void
     {
         $staff = $this->makeStaffUser();
 
@@ -42,13 +54,11 @@ class HospitalProfileEditTest extends TestCase
                 'no_of_beds' => 12,
                 'grade' => 'B',
                 'population' => 1500,
-            ])->assertStatus(201);
+            ])->assertStatus(422)
+            ->assertJsonValidationErrors('island_id');
 
-        $this->assertDatabaseHas('hospital_profiles', [
-            'hospital_contact_id' => null,
-            'island_id' => null,
+        $this->assertDatabaseMissing('hospital_profiles', [
             'no_of_beds' => 12,
-            'grade' => 'B',
         ]);
     }
 
@@ -109,6 +119,34 @@ class HospitalProfileEditTest extends TestCase
         $this->assertDatabaseMissing('hospital_profiles', ['no_of_beds' => 3]);
     }
 
+    public function test_supervisor_can_only_edit_hospitals_in_assigned_atolls(): void
+    {
+        $supervisor = AuthUser::where('email', 'supervisor@rahs.mv')->firstOrFail();
+        $assignedAtoll = Atoll::query()->firstOrFail();
+        $otherAtoll = Atoll::query()->whereKeyNot($assignedAtoll->id)->firstOrFail();
+        $assignedAtoll->update(['supervisor_id' => $supervisor->id]);
+        $otherAtoll->update(['supervisor_id' => null]);
+
+        $assignedIsland = Island::query()->where('atoll_id', $assignedAtoll->id)->firstOrFail();
+        $otherIsland = Island::query()->where('atoll_id', $otherAtoll->id)->firstOrFail();
+
+        $this->actingAs($supervisor)
+            ->postJson('/api/hospital-profiles', [
+                'hospital_contact_id' => $assignedIsland->id,
+                'no_of_beds' => 21,
+            ])->assertCreated();
+
+        $this->actingAs($supervisor)
+            ->postJson('/api/hospital-profiles', [
+                'hospital_contact_id' => $otherIsland->id,
+                'no_of_beds' => 22,
+            ])->assertStatus(422)
+            ->assertJsonValidationErrors('island_id');
+
+        $this->assertDatabaseHas('hospital_profiles', ['island_id' => $assignedIsland->id, 'no_of_beds' => 21]);
+        $this->assertDatabaseMissing('hospital_profiles', ['island_id' => $otherIsland->id, 'no_of_beds' => 22]);
+    }
+
     public function test_staff_dashboard_renders_profile_without_assignment(): void
     {
         $staff = $this->makeStaffUser();
@@ -116,7 +154,8 @@ class HospitalProfileEditTest extends TestCase
         $this->actingAs($staff)
             ->get('/dashboard')
             ->assertOk()
-            ->assertSee('Hospital Profile');
+            ->assertSee('Hospital Profile')
+            ->assertDontSee('Edit profile');
     }
 
     public function test_island_without_contact_appears_in_directory_and_syncs_dashboard_edits(): void
@@ -233,7 +272,8 @@ class HospitalProfileEditTest extends TestCase
         $this->assertCount(1, $nodes);
         $expression = $nodes->item(0)->getAttribute('x-data');
         $this->assertStringContainsString('role: "admin"', $expression);
-        $this->assertStringContainsString('isAdmin: true', $expression);
+        $this->assertStringContainsString('canManageHospitals: true', $expression);
+        $this->assertStringContainsString('canEditProfiles: true', $expression);
         $this->assertStringEndsWith('})', $expression);
     }
 

@@ -30,7 +30,7 @@ class SettingsController extends Controller
             'last_name' => ['required', 'string', 'max:100'],
             'contact_no' => ['nullable', 'string', 'max:20', 'regex:/^[0-9\s+\-()]*$/'],
             'designation' => ['nullable', 'string', 'max:100'],
-            'avatar_url' => ['nullable', 'string'],
+            'avatar_url' => ['nullable', 'string', 'max:500'],
         ]);
 
         $profile = Profile::query()->findOrFail(auth()->id());
@@ -39,7 +39,9 @@ class SettingsController extends Controller
             'last_name' => $data['last_name'],
             'contact_no' => $data['contact_no'] ?: null,
             'designation' => $data['designation'] ?: null,
-            'avatar_url' => $data['avatar_url'] ?? $profile->avatar_url,
+            'avatar_url' => array_key_exists('avatar_url', $data)
+                ? ($data['avatar_url'] !== '' ? $data['avatar_url'] : null)
+                : $profile->avatar_url,
         ]);
 
         return response()->json(['success' => true]);

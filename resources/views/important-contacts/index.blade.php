@@ -23,7 +23,7 @@
             <p class="text-sm text-muted-foreground">Emergency and key administrative contacts</p>
         </div>
         <div class="flex flex-wrap gap-2">
-@if (in_array($role, ['admin', 'supervisor'], true))
+        @if ($role === 'admin')
             <a href="{{ route('important-contacts.admin') }}" class="gov-btn gov-btn-primary text-sm">
                 <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
                 Manage contacts

@@ -13,7 +13,7 @@ class CriticalStaffLeave extends Model
     protected $table = 'critical_staff_leaves';
 
     protected $fillable = [
-        'staff_name', 'staff_id', 'staff_category', 'department_unit',
+        'staff_name', 'staff_id', 'staff_category', 'department_unit', 'hospital_profile_id', 'island_id',
         'assigned_coordinator', 'direct_supervisor', 'leave_type',
         'leave_start_date', 'leave_end_date', 'number_of_leave_days',
         'shift_affected', 'reason_for_leave', 'contact_during_leave',
@@ -30,16 +30,12 @@ class CriticalStaffLeave extends Model
         'direct_supervisor' => 'string',
         'reviewed_by' => 'string',
         'created_by' => 'string',
+        'hospital_profile_id' => 'string',
+        'island_id' => 'string',
         'leave_start_date' => 'date',
         'leave_end_date' => 'date',
         'number_of_leave_days' => 'integer',
     ];
-
-    public const APPROVAL_STATUSES = ['submitted', 'pending_review', 'approved', 'rejected', 'cancelled'];
-
-    public const CRITICAL_LEVELS = ['low', 'medium', 'high', 'critical'];
-
-    public const URGENCIES = ['normal', 'urgent', 'emergency'];
 
     public function coordinator(): BelongsTo
     {
@@ -61,13 +57,14 @@ class CriticalStaffLeave extends Model
         return $this->belongsTo(Profile::class, 'created_by');
     }
 
-    public function isActiveStatus(): bool
+    public function hospitalProfile(): BelongsTo
     {
-        return in_array($this->approval_status, ['submitted', 'pending_review', 'approved']);
+        return $this->belongsTo(HospitalProfile::class, 'hospital_profile_id');
     }
 
-    public function isHighRisk(): bool
+    public function island(): BelongsTo
     {
-        return in_array($this->critical_level, ['high', 'critical']) || in_array($this->urgency, ['urgent', 'emergency']);
+        return $this->belongsTo(Island::class, 'island_id');
     }
+
 }

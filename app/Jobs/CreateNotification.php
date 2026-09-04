@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Notification;
+use App\Services\PushNotificationService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -23,7 +24,7 @@ class CreateNotification implements ShouldQueue
         public readonly ?string $taskId = null,
     ) {}
 
-    public function handle(): void
+    public function handle(PushNotificationService $push): void
     {
         if ($this->userId === null) {
             return;
@@ -36,5 +37,12 @@ class CreateNotification implements ShouldQueue
             'message' => $this->message,
             'is_read' => false,
         ]);
+
+        $push->send(
+            $this->userId,
+            $this->title,
+            $this->message,
+            $this->taskId ? url('/tasks?task='.$this->taskId) : url('/hospital-operations')
+        );
     }
 }

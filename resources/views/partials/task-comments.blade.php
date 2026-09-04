@@ -27,7 +27,10 @@
             <div x-show="tab === 'comments'" class="mt-4 space-y-4">
                 <template x-if="canComment">
                     <div class="flex gap-3">
-                        <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs text-primary" x-text="initials(profileOf(currentUserId))"></div>
+                        <div class="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-primary/10 text-xs text-primary">
+                            <template x-if="profileOf(currentUserId)?.avatar_url"><img :src="profileOf(currentUserId).avatar_url" alt="Your avatar" class="h-full w-full object-cover"></template>
+                            <template x-if="!profileOf(currentUserId)?.avatar_url"><span class="flex h-full w-full items-center justify-center" x-text="initials(profileOf(currentUserId))"></span></template>
+                        </div>
                         <div class="flex-1 space-y-2">
                             <textarea x-model="newComment" @keydown.meta.enter="submitComment()" @keydown.ctrl.enter="submitComment()" placeholder="Add a comment... (Ctrl+Enter to send)" class="textarea min-h-[80px] resize-none"></textarea>
                             <div class="flex justify-end">
@@ -57,7 +60,10 @@
                     <div x-show="comments.length > 0" class="space-y-4">
                         <template x-for="comment in comments" :key="comment.id">
                             <div class="group flex gap-3">
-                                <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs" x-text="initials(profileOf(comment.user_id))"></div>
+                                <div class="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-muted text-xs">
+                                    <template x-if="profileOf(comment.user_id)?.avatar_url"><img :src="profileOf(comment.user_id).avatar_url" alt="Comment author avatar" class="h-full w-full object-cover"></template>
+                                    <template x-if="!profileOf(comment.user_id)?.avatar_url"><span class="flex h-full w-full items-center justify-center" x-text="initials(profileOf(comment.user_id))"></span></template>
+                                </div>
                                 <div class="min-w-0 flex-1">
                                     <div class="flex flex-wrap items-center gap-2">
                                         <span class="text-sm font-medium" x-text="profileName(profileOf(comment.user_id))"></span>
@@ -88,7 +94,10 @@
                     <div x-show="activities.length > 0" class="space-y-3">
                         <template x-for="activity in activities" :key="activity.id">
                             <div class="flex items-start gap-3">
-                                <div class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-[10px]" x-text="initials(profileOf(activity.user_id))"></div>
+                                <div class="mt-0.5 h-6 w-6 shrink-0 overflow-hidden rounded-full bg-muted text-[10px]">
+                                    <template x-if="profileOf(activity.user_id)?.avatar_url"><img :src="profileOf(activity.user_id).avatar_url" alt="Activity author avatar" class="h-full w-full object-cover"></template>
+                                    <template x-if="!profileOf(activity.user_id)?.avatar_url"><span class="flex h-full w-full items-center justify-center" x-text="initials(profileOf(activity.user_id))"></span></template>
+                                </div>
                                 <div class="min-w-0 flex-1">
                                     <p class="text-sm leading-relaxed" x-html="activityMessage(activity)"></p>
                                     <p class="mt-0.5 text-xs text-muted-foreground" x-text="timeAgo(activity.created_at)"></p>

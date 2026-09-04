@@ -7,6 +7,9 @@
     <meta name="app-authenticated" content="true">
     <meta name="theme-color" content="#1a5e5e">
     <title>@yield('title', 'RAHS Portal') — RAHS Task System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&display=swap" rel="stylesheet">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%231a5e5e'/><text x='50' y='68' font-size='48' text-anchor='middle' font-family='sans-serif' font-weight='bold' fill='%2380CBC4'>R</text></svg>">
@@ -18,7 +21,7 @@
     <x-icon name="wifi-off" class="h-4 w-4 shrink-0" />
     <span>You’re offline. Existing information remains available; changes will require a connection.</span>
 </div>
-<div class="app-frame flex min-h-screen w-full bg-background">
+<div class="app-frame flex h-dvh min-h-0 w-full overflow-hidden bg-background">
 
     {{-- Desktop sidebar --}}
     <aside class="app-sidebar sticky top-0 hidden h-dvh shrink-0 p-3 transition-[width] duration-300 lg:flex" :class="$store.sidebar.collapsed ? 'sidebar-collapsed w-[5.25rem]' : 'w-[17.5rem]'">
@@ -33,7 +36,7 @@
         </div>
     </div>
 
-    <div class="flex min-w-0 flex-1 flex-col">
+    <div class="flex min-h-0 min-w-0 flex-1 flex-col">
         <header class="desktop-utility-bar sticky top-0 z-30 hidden h-16 items-center gap-3 border-b border-border/70 bg-background/92 px-5 backdrop-blur-xl lg:flex">
             <button type="button" @click="$store.sidebar.toggleCollapsed()" class="touch-target inline-flex items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground" :aria-label="$store.sidebar.collapsed ? 'Expand navigation' : 'Collapse navigation'" :aria-expanded="!$store.sidebar.collapsed">
                 <x-icon name="menu" class="h-5 w-5" />
@@ -74,7 +77,7 @@
                 <button type="button" @click="$store.theme.toggle()" class="touch-target -mr-2 inline-flex items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground" aria-label="Toggle color theme"><x-icon name="moon" x-show="!$store.theme.dark" class="h-5 w-5" /><x-icon name="sun" x-show="$store.theme.dark" class="h-5 w-5" /></button>
             </div>
         </header>
-        <main id="main-content" tabindex="-1" class="no-scrollbar flex-1 overflow-y-auto overscroll-contain pb-[92px] pt-5 md:pb-5 lg:pt-8">
+        <main id="main-content" tabindex="-1" class="no-scrollbar min-h-0 min-w-0 flex-1 touch-pan-y overflow-x-hidden overflow-y-auto overscroll-y-contain pb-[calc(92px+env(safe-area-inset-bottom,0px))] pt-4 [-webkit-overflow-scrolling:touch] md:pb-5 lg:pt-8">
             <div class="page-shell page-enter">
                 @yield('content')
             </div>
@@ -84,7 +87,7 @@
 
 {{-- Bottom navigation (mobile) --}}
 <nav class="fixed bottom-0 left-0 right-0 z-40 md:hidden safe-bottom" aria-label="Primary navigation">
-    <div class="relative mx-3 mb-3">
+    <div class="relative mx-2 mb-2 sm:mx-3 sm:mb-3">
         <div class="absolute inset-0 rounded-2xl border border-border/70 bg-background/95 shadow-[0_16px_50px_-20px_rgba(0,0,0,.35)] backdrop-blur-xl"></div>
         <div class="relative flex h-[68px] items-center justify-around px-1">
             @php
@@ -112,8 +115,8 @@
 
             {{-- Create button --}}
             <div class="relative -top-4 shrink-0">
-                <div class="absolute -inset-2 rounded-full bg-primary/20 blur-xl"></div>
-                <a href="{{ route('tasks.index', ['create' => 'true']) }}" class="group/btn flex h-14 w-14 items-center justify-center rounded-full border-[3px] border-background bg-primary text-primary-foreground shadow-xl shadow-primary/40 transition-all duration-300 hover:scale-110 active:scale-90" aria-label="Create task">
+                <div class="pointer-events-none absolute -inset-2 rounded-full bg-primary/20 blur-xl" aria-hidden="true"></div>
+                <a href="{{ route('tasks.index', ['create' => 'true']) }}" class="group/btn relative z-10 flex h-14 w-14 items-center justify-center rounded-full border-[3px] border-background bg-primary text-primary-foreground shadow-xl shadow-primary/40 transition-all duration-300 hover:scale-110 active:scale-90" aria-label="Create task">
                     <x-icon name="plus" class="h-7 w-7 transition-transform duration-500 group-hover/btn:rotate-90" />
                 </a>
             </div>
@@ -136,7 +139,7 @@
 </nav>
 
 {{-- Toasts --}}
-<div class="toast-region fixed bottom-20 right-4 z-[60] space-y-2 lg:bottom-6" x-cloak aria-live="polite" aria-atomic="true">
+<div class="toast-region fixed bottom-20 right-4 z-[100] space-y-2 lg:bottom-6" x-cloak aria-live="polite" aria-atomic="true">
     <template x-for="t in $store.toast.items" :key="t.id">
         <div class="flex w-full max-w-sm items-start gap-3 rounded-lg border bg-card px-4 py-3 shadow-lg animate-slide-in-from-bottom"
              :class="t.type === 'error' ? '!border-destructive/50' : t.type === 'info' ? '!border-blue-500/50' : '!border-primary/50'">

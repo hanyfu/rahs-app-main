@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class UserDepartment extends Model
 {
@@ -17,9 +16,4 @@ class UserDepartment extends Model
     protected $keyType = 'string';
 
     public $incrementing = false;
-
-    public function profiles(): HasMany
-    {
-        return $this->hasMany(Profile::class, 'user_department_id');
-    }
 }

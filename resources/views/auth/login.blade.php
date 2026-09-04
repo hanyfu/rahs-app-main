@@ -5,9 +5,13 @@
 @section('content')
     <div class="w-full max-w-sm">
         <div class="mb-10 text-center">
-            <div class="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-xl bg-primary text-2xl font-black text-primary-foreground shadow-sm">
-                R
-            </div>
+            <img
+                src="{{ asset('moh-logo.png') }}"
+                alt="Ministry of Health, Family and Welfare — Republic of Maldives"
+                width="786"
+                height="298"
+                class="mx-auto mb-6 h-auto w-full max-w-[280px] object-contain dark:rounded-xl dark:bg-white dark:p-3"
+            >
             <h1 class="text-2xl font-bold tracking-tight">Sign in to RAHS</h1>
             <p class="mt-1 text-sm text-muted-foreground">Task Manager</p>
         </div>

@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Profile extends Model
@@ -52,16 +51,6 @@ class Profile extends Model
     public function manager(): BelongsTo
     {
         return $this->belongsTo(Profile::class, 'manager_id');
-    }
-
-    public function subordinates(): HasMany
-    {
-        return $this->hasMany(Profile::class, 'manager_id');
-    }
-
-    public function assignedIslands(): HasMany
-    {
-        return $this->hasMany(Island::class, 'assigned_staff_id');
     }
 
     public function getFullNameAttribute(): string

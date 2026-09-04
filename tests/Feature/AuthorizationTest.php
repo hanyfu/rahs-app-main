@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Atoll;
 use App\Models\AuthUser;
 use App\Models\Profile;
+use App\Models\RolePermission;
 use App\Models\UserRole;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -86,6 +87,7 @@ class AuthorizationTest extends TestCase
 
     public function test_supervisor_cannot_grant_admin_role(): void
     {
+        RolePermission::where('permission_key', 'manage_users')->update(['supervisor_access' => true]);
         $supervisor = AuthUser::where('email', 'supervisor@rahs.mv')->first();
         $staff = $this->makeTargetUser('staff');
 
@@ -98,6 +100,7 @@ class AuthorizationTest extends TestCase
 
     public function test_supervisor_cannot_create_admin_users(): void
     {
+        RolePermission::where('permission_key', 'manage_users')->update(['supervisor_access' => true]);
         $supervisor = AuthUser::where('email', 'supervisor@rahs.mv')->first();
 
         $this->actingAs($supervisor)
@@ -143,5 +146,93 @@ class AuthorizationTest extends TestCase
         $this->actingAs($staff)
             ->getJson('/api/users')
             ->assertStatus(403);
+    }
+
+    public function test_all_authenticated_roles_can_view_important_contacts(): void
+    {
+        foreach (['admin@rahs.mv', 'supervisor@rahs.mv', 'coordinator@rahs.mv', 'staff@rahs.mv'] as $email) {
+            $user = AuthUser::where('email', $email)->firstOrFail();
+
+            $this->actingAs($user)
+                ->get('/important-contacts')
+                ->assertOk()
+                ->assertSee('Important Contacts');
+        }
+    }
+
+    public function test_non_admins_cannot_manage_important_contacts(): void
+    {
+        foreach (['supervisor@rahs.mv', 'coordinator@rahs.mv', 'staff@rahs.mv'] as $email) {
+            $user = AuthUser::where('email', $email)->firstOrFail();
+
+            $this->actingAs($user)
+                ->get('/important-contacts-admin')
+                ->assertRedirect('/important-contacts');
+
+            $this->actingAs($user)
+                ->postJson('/api/important-contacts', [
+                    'name' => 'Restricted Contact',
+                    'title' => 'Test Contact',
+                    'phone_primary' => '1234567',
+                ])
+                ->assertForbidden();
+        }
+
+        $this->assertDatabaseMissing('important_contacts', ['name' => 'Restricted Contact']);
+    }
+
+    public function test_admin_can_manage_important_contacts(): void
+    {
+        $admin = AuthUser::where('email', 'admin@rahs.mv')->firstOrFail();
+
+        $this->actingAs($admin)
+            ->get('/important-contacts-admin')
+            ->assertOk();
+
+        $this->actingAs($admin)
+            ->postJson('/api/important-contacts', [
+                'name' => 'Admin Contact',
+                'title' => 'Test Contact',
+                'phone_primary' => '1234567',
+            ])
+            ->assertCreated();
+
+        $this->assertDatabaseHas('important_contacts', ['name' => 'Admin Contact']);
+    }
+
+    public function test_admin_can_edit_user_without_optional_manager_field(): void
+    {
+        $admin = AuthUser::where('email', 'admin@rahs.mv')->firstOrFail();
+        $staff = AuthUser::where('email', 'staff@rahs.mv')->firstOrFail();
+
+        $this->actingAs($admin)
+            ->patchJson("/api/users/{$staff->id}", [
+                'first_name' => 'Updated',
+                'last_name' => 'Staff',
+                'status' => 'active',
+            ])
+            ->assertOk()
+            ->assertJson(['success' => true]);
+
+        $this->assertDatabaseHas('profiles', [
+            'id' => $staff->id,
+            'first_name' => 'Updated',
+            'manager_id' => null,
+        ]);
+    }
+
+    public function test_admin_can_delete_user_using_route_id(): void
+    {
+        $admin = AuthUser::where('email', 'admin@rahs.mv')->firstOrFail();
+        $staff = AuthUser::where('email', 'staff@rahs.mv')->firstOrFail();
+
+        $this->actingAs($admin)
+            ->deleteJson("/api/users/{$staff->id}")
+            ->assertOk()
+            ->assertJson(['success' => true]);
+
+        $this->assertDatabaseMissing('auth_users', ['id' => $staff->id]);
+        $this->assertDatabaseMissing('profiles', ['id' => $staff->id]);
+        $this->assertDatabaseMissing('user_roles', ['user_id' => $staff->id]);
     }
 }

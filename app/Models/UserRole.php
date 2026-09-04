@@ -22,8 +22,6 @@ class UserRole extends Model
 
     public const UPDATED_AT = null;
 
-    public const ROLES = ['admin', 'supervisor', 'coordinator', 'staff'];
-
     public function profile(): BelongsTo
     {
         return $this->belongsTo(Profile::class, 'user_id', 'id');

@@ -3,7 +3,7 @@
 @section('title', 'Dashboard')
 
 @section('content')
-<div class="relative z-0 min-h-screen overflow-x-hidden bg-background" x-data="{ tab: '{{ $tab }}' }">
+<div class="relative z-0 min-h-screen overflow-x-hidden bg-background" x-data="{ tab: @js($tab), setTab(value) { this.tab = value; const url = new URL(window.location.href); url.searchParams.set('tab', value); history.replaceState(null, '', url); } }">
     <div class="mesh-gradient-bg pointer-events-none fixed inset-0 -z-10 opacity-40 dark:opacity-20"></div>
 
     <x-dashboard-header
@@ -59,31 +59,34 @@
         </div>
 
         {{-- Admin management tabs --}}
-        @if (in_array($role, ['admin', 'supervisor'], true))
+        @if ($permissionAccess->only(['manage_atolls','manage_islands','view_users','manage_departments'])->contains(true))
             <div class="w-full space-y-10">
-                <div class="flex w-full flex-nowrap items-center justify-start gap-1 overflow-x-auto rounded-2xl border border-white/10 bg-white/5 p-1.5 no-scrollbar h-auto md:flex-wrap md:justify-center">
-                    <button type="button" @click="tab = 'overview'" class="inline-flex h-9 items-center gap-2 rounded-xl px-4 text-xs font-bold transition-all duration-200" :class="tab === 'overview' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted/50 text-muted-foreground'">
-                        <x-icon name="list-todo" class="h-4 w-4" /> Overview
+                <nav aria-label="Administration sections" class="operations-nav-shell admin-command-nav">
+                  <div class="operations-nav-core">
+                    <button type="button" @click="setTab('overview')" :aria-current="tab==='overview'?'page':null" class="operations-nav-item" :class="tab==='overview'&&'is-active'">
+                        <span class="operations-nav-icon"><x-icon name="list-todo" class="h-4 w-4" /></span><span><strong>Overview</strong><small>System metrics</small></span>
                     </button>
-                    <button type="button" @click="tab = 'atolls'" class="inline-flex h-9 items-center gap-2 rounded-xl px-4 text-xs font-bold transition-all duration-200" :class="tab === 'atolls' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted/50 text-muted-foreground'">
-                        <x-icon name="map-pin" class="h-4 w-4" /> Atolls
+                    @if($permissionAccess['manage_atolls'] ?? false)<button type="button" @click="setTab('atolls')" :aria-current="tab==='atolls'?'page':null" class="operations-nav-item" :class="tab==='atolls'&&'is-active'">
+                        <span class="operations-nav-icon"><x-icon name="map-pin" class="h-4 w-4" /></span><span><strong>Atolls</strong><small>Regional structure</small></span>
+                    </button>@endif
+                    <button type="button" @click="setTab('coordinators')" :aria-current="tab==='coordinators'?'page':null" class="operations-nav-item" :class="tab==='coordinators'&&'is-active'">
+                        <span class="operations-nav-icon"><x-icon name="users" class="h-4 w-4" /></span><span><strong>Coordinators</strong><small>Assignments</small></span>
                     </button>
-                    <button type="button" @click="tab = 'coordinators'" class="inline-flex h-9 items-center gap-2 rounded-xl px-4 text-xs font-bold transition-all duration-200" :class="tab === 'coordinators' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted/50 text-muted-foreground'">
-                        <x-icon name="users" class="h-4 w-4" /> Coordinators
-                    </button>
-                    <button type="button" @click="tab = 'islands'" class="inline-flex h-9 items-center gap-2 rounded-xl px-4 text-xs font-bold transition-all duration-200" :class="tab === 'islands' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted/50 text-muted-foreground'">
-                        <x-icon name="building" class="h-4 w-4" /> Islands
-                    </button>
-                    <button type="button" @click="tab = 'users'" class="inline-flex h-9 items-center gap-2 rounded-xl px-4 text-xs font-bold transition-all duration-200" :class="tab === 'users' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted/50 text-muted-foreground'">
-                        <x-icon name="users" class="h-4 w-4" /> Users
-                    </button>
-                    <button type="button" @click="tab = 'user-departments'" class="inline-flex h-9 items-center gap-2 rounded-xl px-4 text-xs font-bold transition-all duration-200" :class="tab === 'user-departments' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted/50 text-muted-foreground'">
-                        <x-icon name="building-2" class="h-4 w-4" /> Departments
-                    </button>
-                    <button type="button" @click="tab = 'departments'" class="inline-flex h-9 items-center gap-2 rounded-xl px-4 text-xs font-bold transition-all duration-200" :class="tab === 'departments' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted/50 text-muted-foreground'">
-                        <x-icon name="tag" class="h-4 w-4" /> Task Types
-                    </button>
-                </div>
+                    @if($permissionAccess['manage_islands'] ?? false)<button type="button" @click="setTab('islands')" :aria-current="tab==='islands'?'page':null" class="operations-nav-item" :class="tab==='islands'&&'is-active'">
+                        <span class="operations-nav-icon"><x-icon name="building" class="h-4 w-4" /></span><span><strong>Islands</strong><small>Facilities</small></span>
+                    </button>@endif
+                    @if($permissionAccess['view_users'] ?? false)<button type="button" @click="setTab('users')" :aria-current="tab==='users'?'page':null" class="operations-nav-item" :class="tab==='users'&&'is-active'">
+                        <span class="operations-nav-icon"><x-icon name="users" class="h-4 w-4" /></span><span><strong>Users</strong><small>Accounts & roles</small></span>
+                    </button>@endif
+                    @if($permissionAccess['manage_departments'] ?? false)<button type="button" @click="setTab('user-departments')" :aria-current="tab==='user-departments'?'page':null" class="operations-nav-item" :class="tab==='user-departments'&&'is-active'">
+                        <span class="operations-nav-icon"><x-icon name="building-2" class="h-4 w-4" /></span><span><strong>Departments</strong><small>Staff groups</small></span>
+                    </button>@endif
+                    @if($permissionAccess['manage_departments'] ?? false)<button type="button" @click="setTab('departments')" :aria-current="tab==='departments'?'page':null" class="operations-nav-item" :class="tab==='departments'&&'is-active'">
+                        <span class="operations-nav-icon"><x-icon name="tag" class="h-4 w-4" /></span><span><strong>Task Types</strong><small>Work categories</small></span>
+                    </button>@endif
+                  </div>
+                  <div class="operations-nav-mobile-hint"><span>Swipe to explore</span><x-icon name="arrow-right" class="h-3.5 w-3.5" /></div>
+                </nav>
 
                 {{-- Overview --}}
                 <div x-show="tab === 'overview'" x-cloak class="animate-fade-in text-sm text-muted-foreground">
@@ -149,9 +152,9 @@
                     </div>
 
                     {{-- Atoll create/edit dialog --}}
-                    <div class="fixed inset-0 z-50 flex items-center justify-center p-4" x-show="dialogOpen" x-cloak role="dialog" aria-modal="true" aria-label="Atoll details">
+                    <div class="fixed inset-0 z-50 flex items-center justify-center p-4" x-show="dialogOpen" x-cloak @keydown.escape.window="dialogOpen = false" role="dialog" aria-modal="true" aria-label="Atoll details">
                         <div class="absolute inset-0 bg-black/60" @click="dialogOpen = false"></div>
-                        <div class="relative z-10 w-full max-w-md rounded-xl border border-border bg-background p-6 shadow-2xl animate-zoom-in">
+                        <div class="relative z-10 max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto overscroll-contain rounded-xl border border-border bg-background p-6 shadow-2xl animate-zoom-in">
                             <h2 class="text-lg font-bold" x-text="editingAtoll ? 'Edit Atoll' : 'Create Atoll'"></h2>
                             <p class="text-sm text-muted-foreground" x-text="editingAtoll ? 'Update atoll information' : 'Add a new atoll information'"></p>
                             <div class="mt-4 space-y-4">
@@ -327,9 +330,9 @@
                     </div>
 
                     {{-- Coordinator view dialog --}}
-                    <div class="fixed inset-0 z-50 flex items-center justify-center p-4" x-show="viewing" x-cloak role="dialog" aria-modal="true" aria-label="Coordinator details">
+                    <div class="fixed inset-0 z-50 flex items-center justify-center p-4" x-show="viewing" x-cloak @keydown.escape.window="viewing = null" role="dialog" aria-modal="true" aria-label="Coordinator details">
                         <div class="absolute inset-0 bg-black/60" @click="viewing = null"></div>
-                        <div class="relative z-10 w-full max-w-md rounded-xl border border-border bg-background p-6 shadow-2xl animate-zoom-in">
+                        <div class="relative z-10 max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto overscroll-contain rounded-xl border border-border bg-background p-6 shadow-2xl animate-zoom-in">
                             <template x-if="viewing">
                                 <div>
                                     <div class="flex items-center gap-4">
@@ -359,9 +362,9 @@
                     </div>
 
                     {{-- Coordinator edit assignments dialog --}}
-                    <div class="fixed inset-0 z-50 flex items-center justify-center p-4" x-show="editing" x-cloak role="dialog" aria-modal="true" aria-label="Edit coordinator">
+                    <div class="fixed inset-0 z-50 flex items-center justify-center p-4" x-show="editing" x-cloak @keydown.escape.window="editing = null" role="dialog" aria-modal="true" aria-label="Edit coordinator">
                         <div class="absolute inset-0 bg-black/60" @click="editing = null"></div>
-                        <div class="relative z-10 w-full max-w-md rounded-xl border border-border bg-background p-6 shadow-2xl animate-zoom-in">
+                        <div class="relative z-10 max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto overscroll-contain rounded-xl border border-border bg-background p-6 shadow-2xl animate-zoom-in">
                             <template x-if="editing">
                                 <div>
                                     <h2 class="text-lg font-bold" x-text="'Assign Atolls — ' + editing.full_name"></h2>
@@ -454,9 +457,9 @@
                     </div>
 
                     {{-- Island create/edit dialog --}}
-                    <div class="fixed inset-0 z-50 flex items-center justify-center p-4" x-show="dialogOpen" x-cloak role="dialog" aria-modal="true" aria-label="Island details">
+                    <div class="fixed inset-0 z-50 flex items-center justify-center p-4" x-show="dialogOpen" x-cloak @keydown.escape.window="dialogOpen = false" role="dialog" aria-modal="true" aria-label="Island details">
                         <div class="absolute inset-0 bg-black/60" @click="dialogOpen = false"></div>
-                        <div class="relative z-10 w-full max-w-md rounded-xl border border-border bg-background p-6 shadow-2xl animate-zoom-in">
+                        <div class="relative z-10 max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto overscroll-contain rounded-xl border border-border bg-background p-6 shadow-2xl animate-zoom-in">
                             <h2 class="text-lg font-bold" x-text="editingIsland ? 'Edit Island' : 'Create Island'"></h2>
                             <p class="text-sm text-muted-foreground" x-text="editingIsland ? 'Update island information' : 'Add a new island'"></p>
                             <div class="mt-4 space-y-4">
@@ -506,7 +509,7 @@
                                 <h3 class="card-title">Users</h3>
                                 <p class="card-description">Manage employee accounts and access</p>
                             </div>
-                            <button type="button" @click="openCreate()" class="btn"><x-icon name="plus" class="mr-2 h-4 w-4" /> Add User</button>
+                            @if($permissionAccess['manage_users'] ?? false)<button type="button" @click="openCreate()" class="btn"><x-icon name="plus" class="mr-2 h-4 w-4" /> Add User</button>@endif
                         </div>
                         <div class="card-content">
                             <div class="overflow-x-auto rounded-lg border border-border">
@@ -544,7 +547,7 @@
                                                     <span class="badge" :class="p.status === 'active' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'" x-text="p.status"></span>
                                                 </td>
                                                 <td class="table-cell">
-                                                    <select class="select-trigger h-9 w-28" :value="getRole(p.id)" :disabled="p.id === currentUserId && getRole(p.id) === 'admin'" @change="updateRole(p, $event.target.value)">
+                                                    <select class="select-trigger h-9 w-28" :value="getRole(p.id)" :disabled="{{ ($permissionAccess['manage_users'] ?? false) ? 'false' : 'true' }} || (p.id === currentUserId && getRole(p.id) === 'admin')" @change="updateRole(p, $event.target.value)">
                                                         <option value="admin">Admin</option>
                                                         <option value="supervisor">Supervisor</option>
                                                         <option value="coordinator">Coordinator</option>
@@ -552,10 +555,10 @@
                                                     </select>
                                                 </td>
                                                 <td class="table-cell text-right">
-                                                    <div class="inline-flex items-center gap-2">
+                                                    @if($permissionAccess['manage_users'] ?? false)<div class="inline-flex items-center gap-2">
                                                         <button type="button" @click="openEdit(p)" class="btn btn-ghost btn-sm" aria-label="Edit user"><x-icon name="pencil" class="h-4 w-4" /></button>
                                                         <button type="button" @click="remove(p.id)" class="btn btn-ghost btn-sm" aria-label="Delete user"><x-icon name="trash-2" class="h-4 w-4 text-destructive" /></button>
-                                                    </div>
+                                                    </div>@endif
                                                 </td>
                                             </tr>
                                         </template>
@@ -566,9 +569,9 @@
                     </div>
 
                     {{-- User create/edit dialog --}}
-                    <div class="fixed inset-0 z-50 flex items-center justify-center p-4" x-show="dialogOpen" x-cloak role="dialog" aria-modal="true" aria-label="User details">
+                    <div class="fixed inset-0 z-50 flex items-center justify-center p-4" x-show="dialogOpen" x-cloak @keydown.escape.window="dialogOpen = false" role="dialog" aria-modal="true" aria-label="User details">
                         <div class="absolute inset-0 bg-black/60" @click="dialogOpen = false"></div>
-                        <div class="relative z-10 w-full max-w-md rounded-xl border border-border bg-background p-6 shadow-2xl animate-zoom-in">
+                        <div class="relative z-10 max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto overscroll-contain rounded-xl border border-border bg-background p-6 shadow-2xl animate-zoom-in">
                             <h2 class="text-lg font-bold" x-text="editingProfile ? 'Edit User' : 'Create User'"></h2>
                             <p class="text-sm text-muted-foreground" x-text="editingProfile ? 'Update user information' : 'Create a new user account'"></p>
                             <div class="mt-4 space-y-4">
@@ -667,9 +670,9 @@
                     </div>
 
                     {{-- Department create/edit dialog --}}
-                    <div class="fixed inset-0 z-50 flex items-center justify-center p-4" x-show="dialogOpen" x-cloak role="dialog" aria-modal="true" aria-label="Department details">
+                    <div class="fixed inset-0 z-50 flex items-center justify-center p-4" x-show="dialogOpen" x-cloak @keydown.escape.window="dialogOpen = false" role="dialog" aria-modal="true" aria-label="Department details">
                         <div class="absolute inset-0 bg-black/60" @click="dialogOpen = false"></div>
-                        <div class="relative z-10 w-full max-w-md rounded-xl border border-border bg-background p-6 shadow-2xl animate-zoom-in">
+                        <div class="relative z-10 max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto overscroll-contain rounded-xl border border-border bg-background p-6 shadow-2xl animate-zoom-in">
                             <h2 class="text-lg font-bold" x-text="(editing ? 'Edit ' : 'Create ') + itemLabel"></h2>
                             <p class="text-sm text-muted-foreground" x-text="editing ? 'Update information' : 'Add a new ' + itemLabel.toLowerCase()"></p>
                             <div class="mt-4 space-y-4">
@@ -751,9 +754,9 @@
                     </div>
 
                     {{-- Task type create/edit dialog --}}
-                    <div class="fixed inset-0 z-50 flex items-center justify-center p-4" x-show="dialogOpen" x-cloak role="dialog" aria-modal="true" aria-label="Task type details">
+                    <div class="fixed inset-0 z-50 flex items-center justify-center p-4" x-show="dialogOpen" x-cloak @keydown.escape.window="dialogOpen = false" role="dialog" aria-modal="true" aria-label="Task type details">
                         <div class="absolute inset-0 bg-black/60" @click="dialogOpen = false"></div>
-                        <div class="relative z-10 w-full max-w-md rounded-xl border border-border bg-background p-6 shadow-2xl animate-zoom-in">
+                        <div class="relative z-10 max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto overscroll-contain rounded-xl border border-border bg-background p-6 shadow-2xl animate-zoom-in">
                             <h2 class="text-lg font-bold" x-text="(editing ? 'Edit ' : 'Create ') + itemLabel"></h2>
                             <p class="text-sm text-muted-foreground" x-text="editing ? 'Update information' : 'Add a new ' + itemLabel.toLowerCase()"></p>
                             <div class="mt-4 space-y-4">
@@ -805,10 +808,12 @@
                                         <p class="mt-0.5 text-xs text-muted-foreground">Update your facility's details so other users can view your hospital card on the Hospitals page.</p>
                                     </div>
                                 </div>
-                                <button type="button" @click="$dispatch('hospital-edit')" class="btn btn-primary shrink-0">
-                                    <x-icon name="pencil" class="mr-1.5 h-4 w-4" />
-                                    Edit profile
-                                </button>
+                                @if ($assignedIsland)
+                                    <button type="button" @click="$dispatch('hospital-edit')" class="btn btn-primary shrink-0">
+                                        <x-icon name="pencil" class="mr-1.5 h-4 w-4" />
+                                        Edit profile
+                                    </button>
+                                @endif
                             </div>
                         @endif
                         @include('partials.hospital-profile', [
@@ -817,7 +822,7 @@
                             'atollName' => $atollName ?? '',
                             'hospitalName' => $hospitalName ?? ($assignedIsland->name . ' Health Facility'),
                             'hospitalContactId' => $hospitalContactId ?? null,
-                            'canEdit' => true,
+                            'canEdit' => (bool) $assignedIsland,
                             'compact' => true,
                             'dashboardStyle' => true,
                         ])
@@ -827,4 +832,3 @@
         @endif
     </main>
 @endsection
-

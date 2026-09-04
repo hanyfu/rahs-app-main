@@ -130,6 +130,7 @@ function taskCard(task, opts = {}) {
         callLogsCount: 0,
         commentsExpanded: false,
         statusDialogOpen: false,
+        statusSaving: false,
         newStatus: task.status || 'pending',
         completionDescription: task.completion_description || '',
         reassignDialogOpen: false,
@@ -151,7 +152,9 @@ function taskCard(task, opts = {}) {
             return priorityConfigOf(this.task.priority);
         },
         get taskType() {
-            if (this.task.task_types && this.task.task_types.length > 0) return null;
+            if (this.task.task_types && this.task.task_types.length > 0) {
+                return this.departments.find((d) => this.task.task_types.includes(d.id)) || this.departments.find((d) => d.id === this.task.department_id) || null;
+            }
             return this.departments.find((d) => d.id === this.task.department_id) || null;
         },
         get locationInfo() {
@@ -200,17 +203,28 @@ function taskCard(task, opts = {}) {
             this.completionDescription = this.task.completion_description || '';
             this.statusDialogOpen = true;
         },
+        closeDialogs() {
+            if (this.statusSaving) return;
+            this.statusDialogOpen = false;
+            this.reassignDialogOpen = false;
+            this.editDialogOpen = false;
+            this.deleteDialogOpen = false;
+        },
         async confirmStatusUpdate() {
             const payload = { status: this.newStatus };
             if (this.newStatus === 'completed') {
                 payload.completion_description = this.completionDescription;
             }
             try {
-                await window.api.patch(`/api/tasks/${this.task.id}`, payload);
+                this.statusSaving = true;
+                const updated = await window.api.patch(`/api/tasks/${this.task.id}`, payload);
+                Object.assign(this.task, updated);
+                this.statusDialogOpen = false;
                 Alpine.store('toast').success('Status updated');
-                window.location.reload();
             } catch (e) {
                 Alpine.store('toast').error(e.message);
+            } finally {
+                this.statusSaving = false;
             }
         },
 
@@ -306,6 +320,8 @@ function callLogManager(taskId, taskTitle, opts = {}) {
         showEdit: false,
         showDelete: false,
         uploading: false,
+        createSaving: false,
+        createError: '',
         formData: {},
         editingLog: null,
         deletingLog: null,
@@ -675,10 +691,6 @@ function taskManager(props = {}) {
             if (!this.nextCursor || this.loadingMore) return;
             this.loadingMore = true;
             window.api.request('/api/tasks?limit=100&cursor=' + encodeURIComponent(this.nextCursor))
-                .then((res) => {
-                    if (!res.ok) throw new Error('Failed to load more tasks');
-                    return res.json();
-                })
                 .then((data) => {
                     const known = new Set(this.tasks.map((t) => t.id));
                     data.tasks.forEach((t) => {
@@ -792,11 +804,12 @@ function taskManager(props = {}) {
         },
 
         openCreate() {
+            const staffIsland = this.userRole === 'staff' && this.islands.length === 1 ? this.islands[0] : null;
             this.createForm = {
                 title: '',
                 creator_description: '',
-                atoll_id: '',
-                island_id: '',
+                atoll_id: staffIsland?.atoll_id || '',
+                island_id: staffIsland?.id || '',
                 assigned_to: this.currentUserId,
                 priority: 'medium',
                 due_date: '',
@@ -806,7 +819,17 @@ function taskManager(props = {}) {
             this.priorityOpen = false;
             this.calendarOpen = false;
             this.calendarCursor = '';
+            this.createError = '';
             this.createDialogOpen = true;
+        },
+        assignedFacilityLabel() {
+            if (this.userRole !== 'staff') return '';
+            if (this.islands.length === 0) return 'No hospital assignment found';
+            if (this.islands.length === 1) {
+                const island = this.islands[0];
+                return `${island.name}${this.atollName(island.atoll_id) ? ` · ${this.atollName(island.atoll_id)}` : ''}`;
+            }
+            return 'Select one of your assigned hospitals';
         },
         priorityOption(value) {
             return this.priorityOptions.find((option) => option.value === value) || this.priorityOptions[1];
@@ -891,8 +914,13 @@ function taskManager(props = {}) {
             }
         },
         async submitCreate() {
-            if (!this.createForm.title.trim() || this.uploading) return;
-            this.uploading = true;
+            if (this.createSaving || this.uploading) return;
+            this.createError = '';
+            if (!this.createForm.title.trim()) {
+                this.createError = 'Enter a task title before creating the task.';
+                return;
+            }
+            this.createSaving = true;
             try {
                 await window.api.post('/api/tasks', {
                     title: this.createForm.title,
@@ -907,9 +935,10 @@ function taskManager(props = {}) {
                 Alpine.store('toast').success('Task created');
                 window.location.reload();
             } catch (e) {
-                Alpine.store('toast').error(e.message);
+                this.createError = e.message || 'The task could not be created. Check the form and try again.';
+                Alpine.store('toast').error(this.createError);
             } finally {
-                this.uploading = false;
+                this.createSaving = false;
             }
         },
 

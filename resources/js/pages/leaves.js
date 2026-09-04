@@ -3,6 +3,9 @@ function leavesPage(props = {}) {
             leaves: props.leaves || [],
             profiles: props.profiles || [],
             setup: props.setup || null,
+            hospitals: props.hospitals || [],
+            staffCategories: props.staffCategories || [],
+            staffCategoryFields: props.staffCategoryFields || {},
             role: props.role || "",
 
             showForm: false,
@@ -11,6 +14,10 @@ function leavesPage(props = {}) {
             editingLeave: null,
             showSetup: false,
             setupForm: {},
+            calendarOpen: '',
+            calendarCursor: '',
+            saving: false,
+            formError: '',
 
             init() {},
 
@@ -23,6 +30,50 @@ function leavesPage(props = {}) {
 
             filteredLeaves() {
                 return this.leaves;
+            },
+
+            labelize(value) {
+                const text = String(value || '').replaceAll('_', ' ');
+                return text ? text.charAt(0).toUpperCase() + text.slice(1) : '';
+            },
+
+            formatDate(value) {
+                if (!value) return 'Date not set';
+                const datePart = String(value).slice(0, 10);
+                const [year, month, day] = datePart.split('-').map(Number);
+                if (!year || !month || !day) return 'Date not set';
+                return new Date(year, month - 1, day).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+            },
+
+            leavePeriod(leave) {
+                const start = this.formatDate(leave.leave_start_date);
+                const end = this.formatDate(leave.leave_end_date);
+                return start === end ? start : `${start} – ${end}`;
+            },
+
+            personName(person) {
+                return [person?.first_name, person?.last_name].filter(Boolean).join(' ') || 'Not assigned';
+            },
+
+            hospitalLabel(hospital) {
+                return hospital?.hospital_contact?.hospital_name || hospital?.island?.name || 'Hospital';
+            },
+
+            hospitalName(leave) {
+                return leave?.hospital_profile?.hospital_contact?.hospital_name || leave?.department_unit || 'Hospital not linked';
+            },
+
+            categoryOptionLabel(category, hospitalId) {
+                const hospital = this.hospitals.find((item) => item.id === hospitalId);
+                const field = this.staffCategoryFields[category];
+                if (!hospital || !field) return category;
+                const count = Number(hospital[field] || 0);
+                return `${category} — ${count} staff`;
+            },
+
+            leaveDaysLabel(days) {
+                const count = Number(days) || 0;
+                return `${count} ${count === 1 ? 'day' : 'days'}`;
             },
 
             statusClasses(status) {
@@ -60,9 +111,11 @@ function leavesPage(props = {}) {
                 for (const s of this.setup) {
                     if (s.status !== 'active') continue;
                     const overlapping = this.leaves.filter((l) =>
-                        l.approval_status === 'approved' &&
+                        ['submitted', 'pending_review', 'approved'].includes(l.approval_status) &&
+                        (!s.hospital_profile_id || l.hospital_profile_id === s.hospital_profile_id) &&
                         l.department_unit === s.department_unit &&
-                        l.staff_category === s.staff_category
+                        l.staff_category === s.staff_category &&
+                        (s.shift === 'All shifts' || l.shift_affected === s.shift)
                     );
                     if (overlapping.length > 0) {
                         const effective = s.total_active_staff - overlapping.length;
@@ -70,7 +123,7 @@ function leavesPage(props = {}) {
                             alerts.push({
                                 key: s.id,
                                 title: `Shortage risk: ${s.department_unit} (${s.staff_category}, ${s.shift})`,
-                                message: `${effective} available but ${s.required_minimum_staff} required. ${overlapping.length} staff on approved leave.`,
+                                message: `${effective} available but ${s.required_minimum_staff} required. ${overlapping.length} active leave record(s).`,
                             });
                         }
                     }
@@ -81,9 +134,8 @@ function leavesPage(props = {}) {
             emptyForm() {
                 return {
                     staff_name: '',
-                    staff_id: '',
-                    staff_category: 'nurse',
-                    department_unit: '',
+                    hospital_profile_id: this.hospitals[0]?.id || '',
+                    staff_category: this.staffCategories[0] || '',
                     assigned_coordinator: '',
                     direct_supervisor: '',
                     leave_type: 'annual',
@@ -101,9 +153,76 @@ function leavesPage(props = {}) {
                 };
             },
 
+            openCalendar(field) {
+                if (this.calendarOpen === field) {
+                    this.calendarOpen = '';
+                    return;
+                }
+                const selected = this.form[field];
+                const base = selected ? new Date(`${selected}T00:00:00`) : new Date();
+                this.calendarCursor = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}`;
+                this.calendarOpen = field;
+            },
+
+            calendarBaseDate() {
+                const [year, month] = (this.calendarCursor || '').split('-').map(Number);
+                return year && month ? new Date(year, month - 1, 1) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+            },
+
+            calendarMonthLabel() {
+                return this.calendarBaseDate().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            },
+
+            calendarDateLabel(field) {
+                if (!this.form[field]) return 'Choose a date';
+                return new Date(`${this.form[field]}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+            },
+
+            calendarDays(field) {
+                const base = this.calendarBaseDate();
+                const gridStart = new Date(base.getFullYear(), base.getMonth(), 1 - base.getDay());
+                const today = new Date();
+                const formatValue = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+                return Array.from({ length: 42 }, (_, index) => {
+                    const date = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + index);
+                    const value = formatValue(date);
+                    return {
+                        value,
+                        day: date.getDate(),
+                        currentMonth: date.getMonth() === base.getMonth(),
+                        today: date.toDateString() === today.toDateString(),
+                        selected: value === this.form[field],
+                        label: date.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
+                    };
+                });
+            },
+
+            changeCalendarMonth(offset) {
+                const base = this.calendarBaseDate();
+                const next = new Date(base.getFullYear(), base.getMonth() + offset, 1);
+                this.calendarCursor = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`;
+            },
+
+            goCalendarToday() {
+                const today = new Date();
+                this.calendarCursor = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+            },
+
+            selectCalendarDate(field, value) {
+                this.form[field] = value;
+                this.calendarOpen = '';
+            },
+
+            clearCalendarDate(field) {
+                this.form[field] = '';
+                this.calendarOpen = '';
+            },
+
             openCreate() {
                 this.editing = false;
                 this.form = this.emptyForm();
+                this.calendarOpen = '';
+                this.formError = '';
                 this.showForm = true;
             },
 
@@ -112,14 +231,13 @@ function leavesPage(props = {}) {
                 this.editingLeave = l;
                 this.form = {
                     staff_name: l.staff_name,
-                    staff_id: l.staff_id,
+                    hospital_profile_id: l.hospital_profile_id || '',
                     staff_category: l.staff_category,
-                    department_unit: l.department_unit,
                     assigned_coordinator: l.assigned_coordinator || '',
                     direct_supervisor: l.direct_supervisor || '',
                     leave_type: l.leave_type,
-                    leave_start_date: l.leave_start_date,
-                    leave_end_date: l.leave_end_date,
+                    leave_start_date: String(l.leave_start_date || '').slice(0, 10),
+                    leave_end_date: String(l.leave_end_date || '').slice(0, 10),
                     shift_affected: l.shift_affected || '',
                     reason_for_leave: l.reason_for_leave || '',
                     contact_during_leave: l.contact_during_leave || '',
@@ -130,10 +248,23 @@ function leavesPage(props = {}) {
                     approval_status: l.approval_status,
                     remarks: l.remarks || '',
                 };
+                this.calendarOpen = '';
+                this.formError = '';
                 this.showForm = true;
             },
 
             async save() {
+                if (this.saving) return;
+                this.formError = '';
+                if (!this.form.hospital_profile_id || !this.form.staff_name?.trim() || !this.form.staff_category || !this.form.leave_start_date || !this.form.leave_end_date) {
+                    this.formError = 'Complete the hospital, staff name, staff category, start date and end date fields.';
+                    return;
+                }
+                if (this.form.leave_end_date < this.form.leave_start_date) {
+                    this.formError = 'The end date must be the same as or later than the start date.';
+                    return;
+                }
+                this.saving = true;
                 try {
                     if (this.editing) {
                         const updated = await window.api.patch(`/api/leaves/${this.editingLeave.id}`, this.form);
@@ -147,7 +278,10 @@ function leavesPage(props = {}) {
                     }
                     this.showForm = false;
                 } catch (e) {
-                    Alpine.store('toast').error(e.message);
+                    this.formError = e.message || 'The leave record could not be saved. Check the fields and try again.';
+                    Alpine.store('toast').error(this.formError);
+                } finally {
+                    this.saving = false;
                 }
             },
 

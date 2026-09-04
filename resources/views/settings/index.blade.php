@@ -10,7 +10,14 @@
     <div class="gov-card p-6">
         <h2 class="font-semibold mb-4">Profile</h2>
         <div class="mb-5 flex items-center gap-4">
-            <x-profile-avatar :profile="$profile" size="lg" />
+            <div class="shrink-0">
+                <template x-if="profileForm.avatar_url">
+                    <img :src="profileForm.avatar_url" alt="Profile avatar preview" class="h-14 w-14 rounded-full bg-muted object-cover">
+                </template>
+                <template x-if="!profileForm.avatar_url">
+                    <div class="flex h-14 w-14 items-center justify-center rounded-full bg-primary/20 text-lg font-bold text-primary">{{ $profile->initials }}</div>
+                </template>
+            </div>
             <div class="flex-1">
                 <p class="font-semibold">{{ $profile->full_name }}</p>
                 <p class="text-sm text-muted-foreground">{{ $profile->email }}</p>
@@ -36,13 +43,13 @@
             </div>
             <div class="sm:col-span-2">
                 <label class="block text-sm font-medium mb-1">Avatar</label>
-                <div x-data="fileField($data.profileForm.avatar_url)" class="flex items-center gap-2">
-                    <input type="text" x-model="profileForm.avatar_url" readonly class="gov-input" placeholder="No avatar set">
-                    <label class="gov-btn gov-btn-outline text-sm cursor-pointer shrink-0">
-                        Upload
-                        <input type="file" class="hidden" accept="image/*" @change="onSelect($event)">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <input type="text" x-model="profileForm.avatar_url" readonly class="gov-input min-w-0" placeholder="No avatar set">
+                    <label class="gov-btn gov-btn-outline shrink-0 cursor-pointer text-sm" :class="avatarUploading && 'pointer-events-none opacity-60'">
+                        <span x-text="avatarUploading ? 'Uploading…' : 'Upload'"></span>
+                        <input type="file" class="hidden" accept=".jpg,.jpeg,.png,.gif,.webp,image/jpeg,image/png,image/gif,image/webp" @change="uploadAvatar($event)" :disabled="avatarUploading">
                     </label>
-                    <button type="button" x-show="profileForm.avatar_url" @click="profileForm.avatar_url = ''" class="gov-btn gov-btn-ghost text-sm">Remove</button>
+                    <button type="button" x-show="profileForm.avatar_url" @click="profileForm.avatar_url = ''" :disabled="avatarUploading" class="gov-btn gov-btn-ghost shrink-0 text-sm">Remove</button>
                 </div>
             </div>
             <div class="sm:col-span-2 flex justify-end">

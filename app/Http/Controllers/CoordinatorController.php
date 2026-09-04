@@ -10,14 +10,6 @@ use Illuminate\Support\Facades\DB;
 
 class CoordinatorController extends Controller
 {
-    public function index()
-    {
-        $data = $this->directoryData();
-        $data['role'] = auth()->user()->role;
-
-        return view('coordinators.index', $data);
-    }
-
     public function directoryData(): array
     {
         $profiles = Profile::query()

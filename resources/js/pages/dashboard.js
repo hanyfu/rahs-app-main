@@ -235,8 +235,9 @@ function userManagement(props = {}) {
                 if (!await window.confirmAction('Delete this user? This action cannot be undone.', { title: 'Delete user', confirmLabel: 'Delete' })) return;
                 try {
                     await window.api.del(`/api/users/${id}`);
+                    this.profiles = this.profiles.filter((profile) => profile.id !== id);
+                    delete this.userRoles[id];
                     Alpine.store('toast').success('User deleted');
-                    window.location.reload();
                 } catch (e) {
                     Alpine.store('toast').error(e.message);
                 }

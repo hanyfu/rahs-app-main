@@ -16,7 +16,7 @@ function contactsPage(props = {}) {
             },
 
             openCreate() {
-                window.location.href = '{{ route("important-contacts.admin") }}';
+                window.location.href = '/important-contacts-admin';
             },
         };
     }

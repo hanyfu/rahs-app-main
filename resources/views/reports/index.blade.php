@@ -7,9 +7,9 @@
     <x-page-header class="mb-6" title="Reports & analytics" description="Monitor task performance across atolls and departments." eyebrow="Insights" icon="bar-chart-3">
         <x-slot:actions>
             <a href="{{ route('reports.index') }}?export=tasks" class="gov-btn gov-btn-outline text-sm" x-show="false">Export CSV</a>
-            <button type="button" @click="download('{{ url('/reports/export/tasks') }}')" class="gov-btn gov-btn-outline"><x-icon name="download" class="h-4 w-4" />Tasks CSV</button>
-            <button type="button" @click="download('{{ url('/reports/export/hospital-contacts') }}')" class="gov-btn gov-btn-outline"><x-icon name="download" class="h-4 w-4" />Hospital contacts</button>
-            <button type="button" @click="download('{{ url('/reports/export/hospital-profiles') }}')" class="gov-btn gov-btn-outline"><x-icon name="download" class="h-4 w-4" />Hospital profiles</button>
+            <button type="button" @click="download('{{ url('/api/reports/export/tasks') }}')" class="gov-btn gov-btn-outline"><x-icon name="download" class="h-4 w-4" />Tasks CSV</button>
+            <button type="button" @click="download('{{ url('/api/reports/export/hospital-contacts') }}')" class="gov-btn gov-btn-outline"><x-icon name="download" class="h-4 w-4" />Hospital contacts</button>
+            <button type="button" @click="download('{{ url('/api/reports/export/hospital-profiles') }}')" class="gov-btn gov-btn-outline"><x-icon name="download" class="h-4 w-4" />Hospital profiles</button>
         </x-slot:actions>
     </x-page-header>
 
@@ -208,8 +208,8 @@
     </div>
 
     {{-- Schedule dialog --}}
-    <div x-show="showSchedule" x-cloak class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4" @click.self="showSchedule = false" role="dialog" aria-modal="true" aria-label="Schedule a report">
-        <div class="w-full sm:max-w-lg bg-card rounded-t-2xl sm:rounded-xl p-5 sm:p-6">
+    <div x-show="showSchedule" x-cloak class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4" @click.self="showSchedule = false" @keydown.escape.window="showSchedule = false" role="dialog" aria-modal="true" aria-label="Schedule a report">
+        <div class="max-h-[calc(100dvh-0.5rem)] w-full overflow-y-auto overscroll-contain sm:max-w-lg bg-card rounded-t-2xl sm:rounded-xl p-5 sm:p-6">
             <h2 class="text-lg font-bold mb-4">Schedule a report</h2>
             <form @submit.prevent="createSchedule()" class="space-y-4">
                 <div>

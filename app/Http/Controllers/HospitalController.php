@@ -28,7 +28,11 @@ class HospitalController extends Controller
                 ->pluck('id');
         } elseif ($role === 'staff') {
             $editableIslandIds = Island::query()->where('assigned_staff_id', $me)->pluck('id');
-        } elseif (in_array($role, ['admin', 'supervisor'], true)) {
+        } elseif ($role === 'supervisor') {
+            $editableIslandIds = Island::query()
+                ->whereIn('atoll_id', Atoll::query()->where('supervisor_id', $me)->pluck('id'))
+                ->pluck('id');
+        } elseif ($role === 'admin') {
             $editableIslandIds = Island::query()->pluck('id');
         } else {
             $editableIslandIds = collect();
@@ -140,6 +144,7 @@ class HospitalController extends Controller
 
     public function storeContact(Request $request)
     {
+        $this->requirePermission('manage_hospitals');
         $data = $request->validate([
             'hospital_name' => ['required', 'string', 'max:255'],
             'island_id' => ['nullable', 'string'],
@@ -164,6 +169,7 @@ class HospitalController extends Controller
 
     public function updateContact(Request $request, string $id)
     {
+        $this->requirePermission('manage_hospitals');
         $contact = HospitalContact::query()->findOrFail($id);
 
         $data = $request->validate([
@@ -268,6 +274,7 @@ class HospitalController extends Controller
 
     public function saveProfile(Request $request)
     {
+        $this->requirePermission('edit_hospital_profiles');
         $target = $request->validate([
             'hospital_contact_id' => ['nullable', 'string'],
         ])['hospital_contact_id'] ?? null;
@@ -297,33 +304,10 @@ class HospitalController extends Controller
         } elseif ($targetIsland) {
             $islandId = $targetIsland->id;
 
-            if (in_array($role, ['admin', 'supervisor'], true)) {
-                // allowed
-            } elseif ($role === 'staff') {
-                $assignedIsland = Island::query()
-                    ->where('assigned_staff_id', auth()->id())
-                    ->where('status', 'active')
-                    ->first();
-                if (! $assignedIsland || $islandId !== $assignedIsland->id) {
-                    throw ValidationException::withMessages([
-                        'island_id' => 'Staff can only edit the hospital profile of their assigned island',
-                    ]);
-                }
-            } elseif ($role === 'coordinator') {
-                $inScope = Atoll::query()
-                    ->where('id', Island::query()->where('id', $islandId)->value('atoll_id'))
-                    ->where('coordinator_id', auth()->id())
-                    ->exists();
-                if (! $inScope) {
-                    throw ValidationException::withMessages([
-                        'island_id' => 'Coordinator can only edit hospital profiles within assigned atoll(s)',
-                    ]);
-                }
-            } else {
-                abort(403, 'Forbidden: Insufficient permissions');
-            }
+            $this->assertProfileAccess($islandId);
         } else {
-            // No contact and no island: staff drafts a standalone profile.
+            // A missing target is only resolved for staff who have an active
+            // island assignment. Unassigned users cannot create shared drafts.
             if ($role !== 'staff') {
                 throw ValidationException::withMessages([
                     'hospital_contact_id' => 'Select a hospital before editing its profile.',
@@ -333,9 +317,12 @@ class HospitalController extends Controller
                 ->where('assigned_staff_id', auth()->id())
                 ->where('status', 'active')
                 ->first();
-            if ($assignedIsland) {
-                $islandId = $assignedIsland->id;
+            if (! $assignedIsland) {
+                throw ValidationException::withMessages([
+                    'island_id' => 'You must be assigned to a hospital before editing its profile.',
+                ]);
             }
+            $islandId = $assignedIsland->id;
         }
 
         $numericFields = [
@@ -421,7 +408,7 @@ class HospitalController extends Controller
     private function assertProfileAccess(string $islandId): void
     {
         $role = auth()->user()->role;
-        if (in_array($role, ['admin', 'supervisor'], true)) {
+        if ($role === 'admin') {
             return;
         }
 
@@ -430,6 +417,18 @@ class HospitalController extends Controller
         if ($role === 'staff') {
             if ($island->assigned_staff_id !== auth()->id()) {
                 throw ValidationException::withMessages(['island_id' => 'Staff can only create hospital profiles for their assigned island']);
+            }
+
+            return;
+        }
+
+        if ($role === 'supervisor') {
+            $inScope = Atoll::query()
+                ->where('id', $island->atoll_id)
+                ->where('supervisor_id', auth()->id())
+                ->exists();
+            if (! $inScope) {
+                throw ValidationException::withMessages(['island_id' => 'Supervisors can only edit hospital profiles within their assigned atoll(s)']);
             }
 
             return;

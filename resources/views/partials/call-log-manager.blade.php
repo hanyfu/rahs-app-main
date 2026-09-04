@@ -1,6 +1,7 @@
 <div
     x-data="callLogManager(task.id, task.title, { assignedTo: task.assigned_to, assignedBy: task.assigned_by, userRole: userRole, currentUserId: currentUserId })"
     x-init="init()"
+    @keydown.escape.window="!uploading && (showAdd=false, showEdit=false, showDelete=false)"
     class="space-y-4"
 >
     {{-- Header with search and add --}}
@@ -45,7 +46,10 @@
                     <div class="p-4">
                         <div class="flex items-start justify-between gap-4">
                             <div class="flex min-w-0 flex-1 gap-3">
-                                <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary" x-text="initials(creatorOf(log.user_id))"></div>
+                                <div class="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-primary/10 text-xs font-bold text-primary">
+                                    <template x-if="creatorOf(log.user_id)?.avatar_url"><img :src="creatorOf(log.user_id).avatar_url" alt="Task log author avatar" class="h-full w-full object-cover"></template>
+                                    <template x-if="!creatorOf(log.user_id)?.avatar_url"><span class="flex h-full w-full items-center justify-center" x-text="initials(creatorOf(log.user_id))"></span></template>
+                                </div>
                                 <div class="min-w-0 flex-1">
                                     <div class="mb-1 flex flex-wrap items-center gap-2">
                                         <span class="font-medium" x-text="log.contact_name"></span>
@@ -81,9 +85,9 @@
     </template>
 
     {{-- Add dialog --}}
-    <div class="fixed inset-0 z-50 flex items-center justify-center p-4" x-show="showAdd" x-cloak role="dialog" aria-modal="true" aria-label="Add call log">
-        <div class="absolute inset-0 bg-black/60"></div>
-        <div class="relative z-10 w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-xl animate-zoom-in">
+    <div class="mobile-dialog fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4" x-show="showAdd" x-cloak role="dialog" aria-modal="true" aria-label="Add call log">
+        <button type="button" class="absolute inset-0 bg-black/60" @click="!uploading && closeAdd()" aria-label="Cancel adding task log"></button>
+        <div class="mobile-dialog-panel relative z-10 max-h-[calc(100dvh-0.5rem)] w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-2xl border border-border bg-card p-5 shadow-xl animate-zoom-in sm:max-h-[calc(100dvh-2rem)] sm:rounded-xl sm:p-6">
             <h3 class="text-lg font-black uppercase tracking-tight">Add Task Log</h3>
             <p class="mt-1 text-sm text-muted-foreground" x-text="'Record a log for ' + (taskTitle || 'this task')"></p>
             <div class="mt-4 space-y-4">
@@ -120,9 +124,9 @@
     </div>
 
     {{-- Edit dialog --}}
-    <div class="fixed inset-0 z-50 flex items-center justify-center p-4" x-show="showEdit" x-cloak role="dialog" aria-modal="true" aria-label="Edit call log">
-        <div class="absolute inset-0 bg-black/60"></div>
-        <div class="relative z-10 w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-xl animate-zoom-in">
+    <div class="mobile-dialog fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4" x-show="showEdit" x-cloak role="dialog" aria-modal="true" aria-label="Edit call log">
+        <button type="button" class="absolute inset-0 bg-black/60" @click="!uploading && closeEdit()" aria-label="Cancel editing task log"></button>
+        <div class="mobile-dialog-panel relative z-10 max-h-[calc(100dvh-0.5rem)] w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-2xl border border-border bg-card p-5 shadow-xl animate-zoom-in sm:max-h-[calc(100dvh-2rem)] sm:rounded-xl sm:p-6">
             <h3 class="text-lg font-black uppercase tracking-tight">Edit Task Log</h3>
             <p class="mt-1 text-sm text-muted-foreground">Update task log details</p>
             <div class="mt-4 space-y-4">
@@ -166,9 +170,9 @@
     </div>
 
     {{-- Delete confirm dialog --}}
-    <div class="fixed inset-0 z-50 flex items-center justify-center p-4" x-show="showDelete" x-cloak role="alertdialog" aria-modal="true" aria-label="Delete call log">
-        <div class="absolute inset-0 bg-black/60"></div>
-        <div class="relative z-10 w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl animate-zoom-in">
+    <div class="mobile-dialog fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4" x-show="showDelete" x-cloak role="alertdialog" aria-modal="true" aria-label="Delete call log">
+        <button type="button" class="absolute inset-0 bg-black/60" @click="showDelete = false" aria-label="Cancel deleting task log"></button>
+        <div class="mobile-dialog-panel relative z-10 max-h-[calc(100dvh-0.5rem)] w-full max-w-md overflow-y-auto overscroll-contain rounded-t-2xl border border-border bg-card p-5 shadow-xl animate-zoom-in sm:max-h-[calc(100dvh-2rem)] sm:rounded-xl sm:p-6">
             <h3 class="text-lg font-black uppercase tracking-tight">Delete Task Log</h3>
             <p class="mt-2 text-sm font-semibold text-slate-600 dark:text-slate-400">Are you sure you want to delete this task log? This action cannot be undone.</p>
             <div class="mt-6 flex justify-end gap-2">

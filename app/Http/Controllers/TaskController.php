@@ -36,7 +36,7 @@ class TaskController extends Controller
 
         $query = Task::query()->with(['assignor', 'assignee', 'department', 'island.atoll']);
 
-        if ($role !== 'admin' && $role !== 'supervisor') {
+        if ($role !== 'admin') {
             $query = $this->taskService->applyTaskAccess($query, $role, $me);
         }
 
@@ -98,6 +98,16 @@ class TaskController extends Controller
             $supervisorIds = Atoll::query()->whereIn('id', $myAtollIds)->whereNotNull('supervisor_id')->pluck('supervisor_id');
             $assignableIds = $staffIds->merge($supervisorIds)->push($me)->unique();
             $assignableProfiles = $profiles->whereIn('id', $assignableIds)->values();
+        } elseif ($role === 'supervisor') {
+            // Supervisors may cover multiple atolls and all hospitals within them.
+            $myAtollIds = Atoll::query()->where('supervisor_id', $me)->pluck('id');
+            $atolls = $atolls->whereIn('id', $myAtollIds)->values();
+            $islands = $islands->whereIn('atoll_id', $myAtollIds)->values();
+
+            $staffIds = Island::query()->whereIn('atoll_id', $myAtollIds)->whereNotNull('assigned_staff_id')->pluck('assigned_staff_id');
+            $coordinatorIds = Atoll::query()->whereIn('id', $myAtollIds)->whereNotNull('coordinator_id')->pluck('coordinator_id');
+            $assignableIds = $staffIds->merge($coordinatorIds)->push($me)->unique();
+            $assignableProfiles = $profiles->whereIn('id', $assignableIds)->values();
         }
 
         $viewMode = $request->query('view', 'list');
@@ -113,7 +123,7 @@ class TaskController extends Controller
 
         $query = Task::query()->with(['assignor', 'assignee', 'department', 'island.atoll']);
 
-        if ($role !== 'admin' && $role !== 'supervisor') {
+        if ($role !== 'admin') {
             $query = $this->taskService->applyTaskAccess($query, $role, $me);
         }
 
@@ -156,6 +166,7 @@ class TaskController extends Controller
 
     public function store(StoreTaskRequest $request)
     {
+        $this->requirePermission('create_tasks');
         $data = $request->validated();
 
         $user = auth()->user();
@@ -184,6 +195,7 @@ class TaskController extends Controller
 
     public function update(UpdateTaskRequest $request, string $id)
     {
+        $this->requirePermission('edit_tasks');
         $task = Task::query()->findOrFail($id);
 
         if (! $this->taskService->canUserAccessTask(auth()->user()->role, auth()->id(), $task)) {
@@ -203,9 +215,6 @@ class TaskController extends Controller
 
         $oldStatus = $task->status;
         $oldAssignee = $task->assigned_to;
-        $oldPriority = $task->priority;
-        $oldTitle = $task->title;
-        $oldDueDate = $task->due_date;
 
         $this->taskService->validateTaskWriteRules(auth()->user()->role, auth()->id(), $candidate, false, $task);
 
@@ -255,6 +264,7 @@ class TaskController extends Controller
 
     public function destroy(Request $request, string $id)
     {
+        $this->requirePermission('delete_tasks');
         $task = Task::query()->findOrFail($id);
 
         if (! in_array(auth()->user()->role, ['admin', 'supervisor'], true)) {

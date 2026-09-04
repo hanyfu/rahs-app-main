@@ -7,6 +7,9 @@
     <meta name="app-authenticated" content="false">
     <meta name="theme-color" content="#1a5e5e">
     <title>@yield('title', 'Sign in') — RAHS Task System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&display=swap" rel="stylesheet">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%231a5e5e'/><text x='50' y='68' font-size='48' text-anchor='middle' font-family='sans-serif' font-weight='bold' fill='%2380CBC4'>R</text></svg>">

@@ -24,7 +24,7 @@
                     </div>
                 </div>
 
-                <div class="mt-8 rounded-lg border border-border p-4" x-data="{ supported: 'serviceWorker' in navigator, installing: false }">
+                <div class="mt-8 rounded-lg border border-border p-4" x-data="{ supported: 'serviceWorker' in navigator, installing: false, canInstall: false }" x-init="$nextTick(() => { canInstall = !!window.beforeinstallpromptEvent; })">
                     <p class="text-sm font-semibold">How to install</p>
                     <ol class="mt-3 list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
                         <li>On your browser, open the address bar menu (or the share icon on mobile Safari).</li>
@@ -32,8 +32,8 @@
                         <li>The app will appear on your home screen like a native app.</li>
                     </ol>
                     <template x-if="supported">
-                        <button type="button" class="gov-btn gov-btn-primary mt-4" x-show="beforeinstallpromptEvent"
-                                @click="installing = true; beforeinstallpromptEvent.prompt();">
+                        <button type="button" class="gov-btn gov-btn-primary mt-4" x-show="canInstall"
+                                @click="installing = true; window.beforeinstallpromptEvent.prompt();">
                             <template x-if="!installing">Install now</template>
                             <template x-if="installing">Installing…</template>
                         </button>

@@ -295,7 +295,7 @@ class QAComprehensiveTest extends TestCase
         $this->actingAs($this->makeUser('coordinator'))->get('/role-permissions')->assertForbidden();
         $this->actingAs($this->makeUser('staff'))->get('/role-permissions')->assertForbidden();
         $this->actingAs($this->makeUser('admin'))->get('/role-permissions')->assertOk();
-        $this->actingAs($this->makeUser('supervisor'))->get('/role-permissions')->assertOk();
+        $this->actingAs($this->makeUser('supervisor'))->get('/role-permissions')->assertForbidden();
     }
 
     public function test_upload_scans_with_clamav_when_enabled_and_rejects_infected(): void

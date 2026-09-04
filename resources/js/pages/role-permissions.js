@@ -8,6 +8,21 @@ function permissionsPage(props = {}) {
 
             init() {},
 
+            async toggleAccess(id, field, enabled) {
+                const permission = this.permissions.find((item) => item.id === id);
+                if (!permission || field === 'admin_access') return;
+                const previous = !!permission[field];
+                permission[field] = enabled;
+                try {
+                    const updated = await window.api.patch(`/api/role-permissions/${id}`, { [field]: enabled });
+                    Object.assign(permission, updated);
+                    Alpine.store('toast').success('Role access updated');
+                } catch (e) {
+                    permission[field] = previous;
+                    Alpine.store('toast').error(e.message);
+                }
+            },
+
             openCreate() {
                 this.editing = false;
                 this.form = { permission_name: '', category: '', permission_description: '', supervisor_access: false, coordinator_access: false, staff_access: false };
@@ -43,7 +58,6 @@ function permissionsPage(props = {}) {
                         Alpine.store('toast').success('Permission added');
                     }
                     this.showForm = false;
-                    location.reload();
                 } catch (e) {
                     Alpine.store('toast').error(e.message);
                 }

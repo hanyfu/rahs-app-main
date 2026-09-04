@@ -8,7 +8,8 @@ function hospitalsPage(props = {}) {
             role: props.role || "",
             editableIslandIds: props.editableIslandIds || [],
             coverage: props.coverage || { updated: 0, total: 0, missing: [] },
-            isAdmin: props.isAdmin,
+            canManageHospitals: !!props.canManageHospitals,
+            canEditProfiles: !!props.canEditProfiles,
 
             filters: { search: '', atoll: 'all', island: 'all' },
             selected: new Set(),
@@ -435,7 +436,7 @@ function hospitalsPage(props = {}) {
 
             canEditProfile(contact) {
                 if (!contact?.island_id) return false;
-                return this.editableIslandIds.includes(contact.island_id);
+                return this.canEditProfiles && this.editableIslandIds.includes(contact.island_id);
             },
 
             totalMedicalStaff() {

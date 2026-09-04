@@ -8,6 +8,7 @@ use App\Models\HospitalContact;
 use App\Models\HospitalProfile;
 use App\Models\Island;
 use App\Models\Profile;
+use App\Models\RolePermission;
 use App\Models\Task;
 use App\Models\UserDepartment;
 use App\Models\UserRole;
@@ -22,6 +23,16 @@ class DashboardController extends Controller
         $user = auth()->user();
         $profile = $service->currentProfile();
         $role = $user->role;
+        $managementPermissions = [
+            'atolls' => 'manage_atolls', 'islands' => 'manage_islands',
+            'users' => 'view_users', 'user-departments' => 'manage_departments',
+            'departments' => 'manage_departments',
+        ];
+        $tab = $request->query('tab', 'overview');
+        if (isset($managementPermissions[$tab]) && ! RolePermission::allows($managementPermissions[$tab], $user)) {
+            abort(403, 'You do not have permission to access this management section.');
+        }
+        $canAdminTools = collect(array_unique($managementPermissions))->contains(fn ($key) => RolePermission::allows($key, $user));
 
         $tasksQuery = Task::query()->where('archived', false);
         $tasksQuery = $service->applyTaskAccess($tasksQuery, $role, $user->id);
@@ -70,14 +81,9 @@ class DashboardController extends Controller
 
                 $hospitalContactId ??= $hospitalProfile?->hospital_contact_id;
             } else {
-                // No island assigned yet: staff may still draft their hospital
-                // details in a standalone profile until an island is assigned.
+                // Keep the dashboard informative, but do not attach or expose
+                // an editable profile until the staff member is assigned.
                 $hospitalName = 'Hospital Profile';
-                $hospitalProfile = HospitalProfile::query()
-                    ->whereNull('hospital_contact_id')
-                    ->whereNull('island_id')
-                    ->latest('updated_at')
-                    ->first();
             }
         }
 
@@ -90,10 +96,13 @@ class DashboardController extends Controller
             'hospitalProfile' => $hospitalProfile,
             'hospitalContactId' => $hospitalContactId,
             'hospitalName' => $hospitalName,
-            'tab' => $request->query('tab', 'overview'),
+            'tab' => $tab,
+            'permissionAccess' => RolePermission::query()->get()->mapWithKeys(fn ($permission) => [
+                $permission->permission_key => RolePermission::allows($permission->permission_key, $user),
+            ]),
         ];
 
-        if (in_array($role, ['admin', 'supervisor'], true)) {
+        if ($canAdminTools || in_array($role, ['admin', 'supervisor'], true)) {
             $data += [
                 'atolls' => Atoll::query()->with(['coordinator'])->orderBy('name')->get(),
                 'islands' => Island::query()->with(['atoll', 'assignedStaff'])->orderBy('name')->get(),

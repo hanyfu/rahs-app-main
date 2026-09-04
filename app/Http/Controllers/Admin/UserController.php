@@ -33,6 +33,7 @@ class UserController extends Controller
 
     public function createUser(Request $request)
     {
+        $this->requirePermission('manage_users');
         $data = $request->validate([
             'email' => ['required', 'email', 'max:255'],
             'password' => ['required', 'min:8', 'max:72', 'regex:/[A-Z]/', 'regex:/[a-z]/', 'regex:/[0-9]/'],
@@ -64,10 +65,10 @@ class UserController extends Controller
                 'email' => $data['email'],
                 'first_name' => $data['firstName'],
                 'last_name' => $data['lastName'],
-                'department_id' => $data['departmentId'] ?: null,
-                'user_department_id' => $data['userDepartmentId'] ?: null,
-                'manager_id' => $data['managerId'] ?: null,
-                'contact_no' => $data['contactNo'] ?: null,
+                'department_id' => $data['departmentId'] ?? null,
+                'user_department_id' => $data['userDepartmentId'] ?? null,
+                'manager_id' => $data['managerId'] ?? null,
+                'contact_no' => $data['contactNo'] ?? null,
             ]);
             UserRole::create(['user_id' => $id, 'role' => $role]);
         });
@@ -77,6 +78,7 @@ class UserController extends Controller
 
     public function update(Request $request, string $id)
     {
+        $this->requirePermission('manage_users');
         $profile = Profile::query()->findOrFail($id);
 
         $data = $request->validate([
@@ -91,10 +93,10 @@ class UserController extends Controller
         $profile->update([
             'first_name' => $data['first_name'],
             'last_name' => $data['last_name'],
-            'contact_no' => $data['contact_no'] ?: null,
-            'user_department_id' => $data['user_department_id'] ?: null,
+            'contact_no' => $data['contact_no'] ?? null,
+            'user_department_id' => $data['user_department_id'] ?? null,
             'status' => $data['status'],
-            'manager_id' => $data['manager_id'] ?: null,
+            'manager_id' => $data['manager_id'] ?? null,
         ]);
 
         return response()->json(['success' => true]);
@@ -102,6 +104,7 @@ class UserController extends Controller
 
     public function updateRole(Request $request, string $id)
     {
+        $this->requirePermission('manage_users');
         $data = $request->validate(['role' => ['required', 'in:admin,supervisor,coordinator,staff']]);
 
         if (auth()->user()->role !== 'admin' && $data['role'] === 'admin') {
@@ -118,13 +121,19 @@ class UserController extends Controller
         return response()->json(['success' => true]);
     }
 
-    public function deleteUser(Request $request)
+    public function deleteUser(string $id)
     {
-        $data = $request->validate(['userId' => ['required', 'string']]);
-        $userId = $data['userId'];
+        $this->requirePermission('manage_users');
+        $userId = $id;
 
         if ($userId === auth()->id()) {
             throw ValidationException::withMessages(['userId' => 'Cannot delete yourself']);
+        }
+
+        $adminCount = UserRole::query()->where('role', 'admin')->count();
+        $targetRole = UserRole::query()->where('user_id', $userId)->value('role');
+        if ($adminCount <= 1 && $targetRole === 'admin') {
+            throw ValidationException::withMessages(['userId' => 'Cannot delete the last admin user']);
         }
 
         DB::transaction(function () use ($userId) {

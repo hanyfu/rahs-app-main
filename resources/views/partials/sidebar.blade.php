@@ -6,12 +6,14 @@
     $tab = request()->query('tab', '');
     $isAdmin = $role === 'admin';
     $isSupervisor = $role === 'supervisor';
+    $can = fn (string $key) => \App\Models\RolePermission::allows($key, $user);
+    $canAdminTools = $can('manage_atolls') || $can('manage_islands') || $can('view_users') || $can('manage_departments');
 @endphp
 
 <div class="flex h-full flex-col bg-[#1a5e5e] text-white dark:bg-[#0d2e2e]">
     {{-- Header --}}
-    <div class="p-6 pb-2">
-        <a href="{{ route('dashboard') }}" class="group mb-6 flex cursor-pointer items-center gap-3">
+    <div class="sidebar-header p-6 pb-2">
+        <a href="{{ route('dashboard') }}" class="sidebar-brand group mb-6 flex cursor-pointer items-center gap-3">
             <div class="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-white/10 text-white shadow-inner transition-all duration-300 group-hover:bg-white/20">
                 <x-icon name="list-todo" class="h-6 w-6" />
             </div>
@@ -39,7 +41,8 @@
     {{-- Content --}}
     <div class="flex-1 overflow-y-auto no-scrollbar px-3">
         {{-- Quick actions --}}
-        <div class="mb-4">
+        @if ($can('create_tasks'))
+        <div class="sidebar-quick-actions mb-4">
             <a
                 href="{{ route('tasks.index', ['create' => 'true']) }}"
                 class="group flex h-11 w-full items-center justify-start rounded-lg border border-teal-500/50 bg-teal-700 text-[10px] font-black uppercase tracking-wider text-white shadow-sm transition-all hover:bg-teal-600 active:scale-[0.98]"
@@ -50,27 +53,26 @@
                 <span class="sidebar-label">Create New Task</span>
             </a>
         </div>
+        @endif
 
-        <div class="my-4 h-px bg-white/10"></div>
+        <div class="sidebar-divider my-4 h-px bg-white/10"></div>
 
         {{-- System Navigation --}}
         <div class="sidebar-section-label mb-2 px-3 text-[10px] font-black uppercase tracking-[0.2em] text-white/40">System Navigation</div>
         <nav class="space-y-1">
             @php
-                $mainNav = [
-                    ['label' => 'Dashboard', 'icon' => 'layout-dashboard', 'path' => route('dashboard'), 'active' => $path === 'dashboard'],
-                    ['label' => 'Task Manager', 'icon' => 'list-todo', 'path' => route('tasks.index'), 'active' => $path === 'tasks'],
-                    ['label' => 'Hospitals', 'icon' => 'building-2', 'path' => route('hospitals.index'), 'active' => $path === 'hospitals'],
-                    ['label' => 'Coordinators', 'icon' => 'users', 'path' => route('coordinators.index'), 'active' => $path === 'coordinators'],
-                ];
-                if ($role !== 'staff') {
-                    $mainNav[] = ['label' => 'Important Contacts', 'icon' => 'phone', 'path' => route('important-contacts.index'), 'active' => $path === 'important-contacts'];
-                }
-                if ($isAdmin || $isSupervisor) {
+                $mainNav = [];
+                if ($can('view_dashboard')) $mainNav[] = ['label' => 'Dashboard', 'icon' => 'layout-dashboard', 'path' => route('dashboard'), 'active' => $path === 'dashboard'];
+                if ($can('view_tasks')) $mainNav[] = ['label' => 'Task Manager', 'icon' => 'list-todo', 'path' => route('tasks.index'), 'active' => $path === 'tasks'];
+                if ($can('view_hospitals')) $mainNav[] = ['label' => 'Hospitals', 'icon' => 'building-2', 'path' => route('hospitals.index'), 'active' => $path === 'hospitals'];
+                $mainNav[] = ['label' => 'Coordinators', 'icon' => 'users', 'path' => route('coordinators.index'), 'active' => $path === 'coordinators'];
+                $mainNav[] = ['label' => 'Important Contacts', 'icon' => 'phone', 'path' => route('important-contacts.index'), 'active' => $path === 'important-contacts'];
+                if ($can('view_reports')) {
                     $mainNav[] = ['label' => 'Reports', 'icon' => 'file-bar-chart', 'path' => route('reports.index'), 'active' => $path === 'reports'];
                 }
                 $mainNav[] = ['label' => 'Staff Leave', 'icon' => 'user-round-check', 'path' => route('leaves.index'), 'active' => $path === 'critical-staff-leave-management'];
-                if ($isAdmin || $isSupervisor) {
+                if ($can('view_operations')) $mainNav[] = ['label' => 'Operations', 'icon' => 'activity', 'path' => route('operations.index'), 'active' => $path === 'hospital-operations'];
+                if ($isAdmin) {
                     $mainNav[] = ['label' => 'Contacts Admin', 'icon' => 'shield', 'path' => route('important-contacts.admin'), 'active' => $path === 'important-contacts-admin'];
                 }
                 $mainNav[] = ['label' => 'Settings', 'icon' => 'settings', 'path' => route('settings.index'), 'active' => $path === 'settings'];
@@ -78,7 +80,7 @@
             @foreach ($mainNav as $item)
                 <a
                     href="{{ $item['path'] }}"
-                    class="group flex h-11 items-center rounded-lg px-3 transition-all duration-200 {{ $item['active'] ? 'bg-white font-black text-primary shadow-md' : 'text-white/70 hover:bg-white/5 hover:text-white' }}"
+                    class="sidebar-nav-item group flex h-11 items-center rounded-lg px-3 transition-all duration-200 {{ $item['active'] ? 'bg-white font-black text-primary shadow-md' : 'text-white/70 hover:bg-white/5 hover:text-white' }}"
                 >
                     <x-icon name="{{ $item['icon'] }}" class="{{ $item['active'] ? 'text-primary' : 'text-white/40 group-hover:text-white/70' }} mr-3 h-4 w-4 transition-colors" />
                     <span class="sidebar-label text-sm font-bold tracking-tight">{{ $item['label'] }}</span>
@@ -87,7 +89,7 @@
         </nav>
 
         {{-- Access Control --}}
-        @if ($isAdmin || $isSupervisor)
+        @if ($canAdminTools || $isAdmin)
             <div class="sidebar-admin mt-6">
                 <div class="mb-2 px-3 text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Access Control</div>
                 <div x-data="{ open: true }" class="group/collapsible">
@@ -101,15 +103,20 @@
                     <div x-show="open">
                         <div class="ml-4 border-l border-white/10 py-1">
                             @php
-                                $adminNav = [
-                                    ['label' => 'Atoll Records', 'icon' => 'map-pin', 'path' => route('dashboard', ['tab' => 'atolls']), 'active' => $path === 'dashboard' && $tab === 'atolls'],
-                                    ['label' => 'Island Records', 'icon' => 'building', 'path' => route('dashboard', ['tab' => 'islands']), 'active' => $path === 'dashboard' && $tab === 'islands'],
-                                    ['label' => 'Atoll Coordinators', 'icon' => 'users', 'path' => route('dashboard', ['tab' => 'coordinators']), 'active' => $path === 'dashboard' && $tab === 'coordinators'],
-                                    ['label' => 'User Database', 'icon' => 'users', 'path' => route('dashboard', ['tab' => 'users']), 'active' => $path === 'dashboard' && $tab === 'users'],
-                                    ['label' => 'Departments', 'icon' => 'building-2', 'path' => route('dashboard', ['tab' => 'user-departments']), 'active' => $path === 'dashboard' && $tab === 'user-departments'],
-                                    ['label' => 'Role Permissions', 'icon' => 'shield', 'path' => route('role-permissions.index'), 'active' => $path === 'role-permissions'],
-                                    ['label' => 'Task Types', 'icon' => 'tag', 'path' => route('dashboard', ['tab' => 'departments']), 'active' => $path === 'dashboard' && $tab === 'departments'],
-                                ];
+                                $adminNav = [];
+                                if ($can('manage_atolls')) $adminNav[] = ['label' => 'Atoll Records', 'icon' => 'map-pin', 'path' => route('dashboard', ['tab' => 'atolls']), 'active' => $path === 'dashboard' && $tab === 'atolls'];
+                                if ($can('manage_islands')) $adminNav[] = ['label' => 'Island Records', 'icon' => 'building', 'path' => route('dashboard', ['tab' => 'islands']), 'active' => $path === 'dashboard' && $tab === 'islands'];
+                                if ($can('view_users')) $adminNav[] = ['label' => 'User Database', 'icon' => 'users', 'path' => route('dashboard', ['tab' => 'users']), 'active' => $path === 'dashboard' && $tab === 'users'];
+                                if ($can('manage_departments')) $adminNav[] = ['label' => 'Departments', 'icon' => 'building-2', 'path' => route('dashboard', ['tab' => 'user-departments']), 'active' => $path === 'dashboard' && $tab === 'user-departments'];
+                                if ($can('manage_departments')) $adminNav[] = ['label' => 'Task Types', 'icon' => 'tag', 'path' => route('dashboard', ['tab' => 'departments']), 'active' => $path === 'dashboard' && $tab === 'departments'];
+                                if ($isAdmin) {
+                                    array_splice($adminNav, 5, 0, [[
+                                        'label' => 'Role Permissions',
+                                        'icon' => 'shield',
+                                        'path' => route('role-permissions.index'),
+                                        'active' => $path === 'role-permissions',
+                                    ]]);
+                                }
                             @endphp
                             @foreach ($adminNav as $item)
                                 <a

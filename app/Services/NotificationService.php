@@ -158,7 +158,11 @@ class NotificationService
 
     public function getLeaveNotificationRecipients(CriticalStaffLeave $leave): array
     {
-        $recipientIds = collect();
+        $recipientIds = collect([$leave->assigned_coordinator, $leave->direct_supervisor]);
+
+        if ($leave->island_id) {
+            $recipientIds->push(Island::query()->whereKey($leave->island_id)->value('assigned_staff_id'));
+        }
 
         // 1) Replacement island staff
         $replacementIslandName = $this->extractIslandNameFromReplacement($leave->replacement_staff);
@@ -190,9 +194,6 @@ class NotificationService
                 ->pluck('coordinator_id');
             $recipientIds = $recipientIds->concat($coordinatorIds);
         }
-
-        // 3) All supervisors
-        $recipientIds = $recipientIds->concat($this->getRoleUserIds(['supervisor']));
 
         return $recipientIds->unique()->filter()->values()->all();
     }

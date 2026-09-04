@@ -18,19 +18,15 @@ class TaskService
         return $userId ? Profile::query()->find($userId) : null;
     }
 
-    public function currentRole(): string
-    {
-        return auth()->user()?->role ?? 'user';
-    }
-
     public function applyTaskAccess(Builder $query, string $role, ?string $userId): Builder
     {
-        if (in_array($role, ['admin', 'supervisor'], true)) {
+        if ($role === 'admin') {
             return $query;
         }
 
-        if ($role === 'coordinator') {
-            $atollIds = Atoll::query()->where('coordinator_id', $userId)->pluck('id');
+        if (in_array($role, ['coordinator', 'supervisor'], true)) {
+            $assignmentColumn = $role === 'coordinator' ? 'coordinator_id' : 'supervisor_id';
+            $atollIds = Atoll::query()->where($assignmentColumn, $userId)->pluck('id');
             $islandIds = Island::query()->whereIn('atoll_id', $atollIds)->pluck('id');
 
             return $query->where(function ($q) use ($userId, $islandIds) {
@@ -48,18 +44,19 @@ class TaskService
 
     public function canUserAccessTask(string $role, ?string $userId, Task $task): bool
     {
-        if (in_array($role, ['admin', 'supervisor'], true)) {
+        if ($role === 'admin') {
             return true;
         }
 
-        if ($role === 'coordinator') {
+        if (in_array($role, ['coordinator', 'supervisor'], true)) {
             if ($task->assigned_to === $userId || $task->assigned_by === $userId) {
                 return true;
             }
 
             if ($task->island_id) {
                 $atollId = $task->island?->atoll_id;
-                if ($atollId && Atoll::query()->where('id', $atollId)->where('coordinator_id', $userId)->exists()) {
+                $assignmentColumn = $role === 'coordinator' ? 'coordinator_id' : 'supervisor_id';
+                if ($atollId && Atoll::query()->where('id', $atollId)->where($assignmentColumn, $userId)->exists()) {
                     return true;
                 }
             }
@@ -75,7 +72,7 @@ class TaskService
      */
     public function validateTaskWriteRules(string $role, ?string $userId, array $candidate, bool $isCreate = false, ?Task $existingTask = null): void
     {
-        if (in_array($role, ['admin', 'supervisor'], true)) {
+        if ($role === 'admin') {
             return;
         }
 
@@ -122,6 +119,24 @@ class TaskService
                     ->exists();
                 if (! $inScope) {
                     throw ValidationException::withMessages(['island_id' => 'Coordinator can only create or move tasks within assigned atoll(s)']);
+                }
+            }
+        }
+
+        // Supervisors can create or move tasks across every atoll assigned to them.
+        if ($role === 'supervisor') {
+            if ($isCreate && empty($candidate['island_id'])) {
+                throw ValidationException::withMessages(['island_id' => 'Supervisor can only create tasks within assigned atoll(s)']);
+            }
+
+            if (! empty($candidate['island_id'])) {
+                $inScope = Island::query()
+                    ->where('islands.id', $candidate['island_id'])
+                    ->join('atolls', 'atolls.id', '=', 'islands.atoll_id')
+                    ->where('atolls.supervisor_id', $userId)
+                    ->exists();
+                if (! $inScope) {
+                    throw ValidationException::withMessages(['island_id' => 'Supervisor can only create or move tasks within assigned atoll(s)']);
                 }
             }
         }

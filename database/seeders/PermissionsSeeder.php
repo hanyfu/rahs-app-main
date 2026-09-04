@@ -24,6 +24,8 @@ class PermissionsSeeder extends Seeder
             ['view_users', 'View Users', 'User Management', true, true, false, false],
             ['manage_users', 'Manage Users', 'User Management', true, false, false, false],
             ['manage_departments', 'Manage Departments', 'Settings', true, false, false, false],
+            ['view_operations', 'View Hospital Operations', 'Hospital Operations', true, true, true, true],
+            ['manage_operations', 'Manage Hospital Operations', 'Hospital Operations', true, true, true, true],
         ];
 
         foreach ($permissions as [$key, $name, $cat, $adm, $sup, $coo, $sta]) {

@@ -11,5 +11,5 @@
         <h1 class="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">{{ $title }}</h1>
         @if ($description)<div class="mt-1.5 text-sm leading-6 text-muted-foreground">{{ $description }}</div>@endif
     </div>
-    @isset($actions)<div class="flex shrink-0 flex-wrap items-center gap-2">{{ $actions }}</div>@endisset
+    @isset($actions)<div class="page-header-actions flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto">{{ $actions }}</div>@endisset
 </header>

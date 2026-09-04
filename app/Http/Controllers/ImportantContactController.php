@@ -9,10 +9,6 @@ class ImportantContactController extends Controller
 {
     public function index()
     {
-        if (auth()->check() && auth()->user()->role === 'staff') {
-            return redirect()->route('dashboard');
-        }
-
         $contacts = ImportantContact::query()->where('status', 'active')->orderBy('priority')->get();
 
         $role = auth()->check() ? auth()->user()->role : '';
@@ -22,8 +18,8 @@ class ImportantContactController extends Controller
 
     public function admin()
     {
-        if (! in_array(auth()->user()->role, ['admin', 'supervisor'], true)) {
-            return redirect()->route('important-contacts');
+        if (auth()->user()->role !== 'admin') {
+            return redirect()->route('important-contacts.index');
         }
 
         $contacts = ImportantContact::query()->where('status', 'active')->orderBy('priority')->get();
@@ -54,11 +50,11 @@ class ImportantContactController extends Controller
         $contact = ImportantContact::create([
             'name' => $data['name'],
             'title' => $data['title'],
-            'organization' => $data['organization'] ?: null,
+            'organization' => $data['organization'] ?? null,
             'phone_primary' => $data['phone_primary'],
-            'phone_secondary' => $data['phone_secondary'] ?: null,
-            'email' => $data['email'] ?: null,
-            'notes' => $data['notes'] ?: null,
+            'phone_secondary' => $data['phone_secondary'] ?? null,
+            'email' => $data['email'] ?? null,
+            'notes' => $data['notes'] ?? null,
             'priority' => $data['priority'] ?? 100,
             'status' => 'active',
         ]);
@@ -98,6 +94,18 @@ class ImportantContactController extends Controller
     public function deactivate(string $id)
     {
         ImportantContact::query()->findOrFail($id)->update(['status' => 'inactive']);
+
+        return response()->json(['success' => true]);
+    }
+
+    public function bulkDeactivate(Request $request)
+    {
+        $data = $request->validate([
+            'ids' => ['required', 'array'],
+            'ids.*' => ['required', 'string'],
+        ]);
+
+        ImportantContact::query()->whereIn('id', $data['ids'])->update(['status' => 'inactive']);
 
         return response()->json(['success' => true]);
     }

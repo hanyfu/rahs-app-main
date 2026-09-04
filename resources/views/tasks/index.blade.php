@@ -8,7 +8,7 @@
 @section('title', 'Task Manager')
 
 @section('content')
-<div x-data='taskManager({ tasks: @json($tasks), profiles: @json($profiles), assignableProfiles: @json($assignableProfiles), islands: @json($islands), atolls: @json($atolls), departments: @json($departments), archivedCounts: @json($archivedCounts), nextCursor: @json($nextCursor), userRole: @json($userRole), currentUserId: @json($currentUserId) })' x-init="init()" x-effect="syncUrl()" class="relative min-h-screen bg-background">
+<div x-data='taskManager({ tasks: @json($tasks), profiles: @json($profiles), assignableProfiles: @json($assignableProfiles), islands: @json($islands), atolls: @json($atolls), departments: @json($departments), archivedCounts: @json($archivedCounts), nextCursor: @json($nextCursor), userRole: @json($userRole), currentUserId: @json($currentUserId) })' x-init="init()" x-effect="syncUrl()" @keydown.escape.window="!createSaving && !uploading && (createDialogOpen=false); archiveDialogOpen=false" class="relative min-h-full bg-background">
     {{-- Ambient mesh gradient background --}}
     <div class="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
         <div class="absolute -top-32 left-1/2 h-[420px] w-[720px] -translate-x-1/2 rounded-full bg-primary/10 blur-[120px]"></div>
@@ -22,7 +22,7 @@
             titleAccent="Manager"
             subtitle="Official Task Management"
             onRefresh="window.location.reload()"
-            :exportUrl="in_array($userRole, ['admin', 'supervisor'], true) ? url('/reports/export/tasks') : null"
+            :exportUrl="in_array($userRole, ['admin', 'supervisor'], true) ? url('/api/reports/export/tasks') : null"
             exportLabel="Export"
         />
 
@@ -96,7 +96,7 @@
                                 Advanced
                                 <span x-show="filters.status || filters.user" x-cloak class="h-1.5 w-1.5 rounded-full bg-primary"></span>
                             </button>
-                            <div x-show="advancedOpen" x-cloak class="absolute right-0 z-40 mt-2 w-72 rounded-lg border border-border bg-card p-4 shadow-xl animate-fade-in">
+                            <div x-show="advancedOpen" x-cloak class="absolute right-0 z-40 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-card p-4 shadow-xl animate-fade-in">
                                 <p class="mb-3 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Advanced Filters</p>
                                 <div class="space-y-3">
                                     <div class="space-y-1.5">
@@ -152,10 +152,10 @@
                             </button>
                         </div>
 
-                        <button type="button" @click="openCreate()" class="btn h-11 items-center gap-2 rounded-lg px-4 text-xs font-black uppercase tracking-widest">
+                        @if(\App\Models\RolePermission::allows('create_tasks'))<button type="button" @click="openCreate()" class="btn h-11 items-center gap-2 rounded-lg px-4 text-xs font-black uppercase tracking-widest">
                             <x-icon name="plus" class="h-4 w-4" />
                             Create Task
-                        </button>
+                        </button>@endif
                     </div>
                 </div>
 
@@ -227,10 +227,10 @@
                             <p class="mx-auto mt-2 max-w-sm text-sm font-medium text-muted-foreground">
                                 No official tasks match your current filters. Adjust the search criteria or initialize a new operation.
                             </p>
-                            <button type="button" @click="openCreate()" class="btn mt-6 items-center gap-2 rounded-lg px-4 text-xs font-black uppercase tracking-widest">
+                            @if(\App\Models\RolePermission::allows('create_tasks'))<button type="button" @click="openCreate()" class="btn mt-6 items-center gap-2 rounded-lg px-4 text-xs font-black uppercase tracking-widest">
                                 <x-icon name="plus" class="h-4 w-4" />
                                 Initialize New Task
-                            </button>
+                            </button>@endif
                         </div>
                     </template>
 
@@ -327,10 +327,10 @@
                             <p class="mx-auto mt-2 max-w-sm text-sm font-medium text-muted-foreground">
                                 No official tasks match your current filters. Adjust the search criteria or initialize a new operation.
                             </p>
-                            <button type="button" @click="openCreate()" class="btn mt-6 items-center gap-2 rounded-lg px-4 text-xs font-black uppercase tracking-widest">
+                            @if(\App\Models\RolePermission::allows('create_tasks'))<button type="button" @click="openCreate()" class="btn mt-6 items-center gap-2 rounded-lg px-4 text-xs font-black uppercase tracking-widest">
                                 <x-icon name="plus" class="h-4 w-4" />
                                 Initialize New Task
-                            </button>
+                            </button>@endif
                         </div>
                     </template>
                 </div>
@@ -363,20 +363,23 @@
         </div>
     </div>
 {{-- Create task dialog --}}
-    <div class="fixed inset-0 z-50 flex items-center justify-center p-4" x-show="createDialogOpen" x-cloak role="dialog" aria-modal="true" aria-label="Create task">
-        <div class="absolute inset-0 bg-black/60"></div>
-        <div class="relative z-10 flex max-h-[calc(100vh-3rem)] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xl animate-zoom-in">
+    <template x-teleport="body">
+    <div class="mobile-dialog fixed inset-0 z-[70] flex items-end justify-center p-0 sm:items-center sm:p-4" x-show="createDialogOpen" x-cloak @keydown.escape.window="!createSaving && !uploading && (createDialogOpen = false)" role="dialog" aria-modal="true" aria-label="Create task">
+        <button type="button" class="absolute inset-0 bg-black/60" @click="!createSaving && !uploading && (createDialogOpen = false)" aria-label="Close create task dialog"></button>
+        <div class="mobile-dialog-panel relative z-10 flex max-h-[calc(100dvh-0.5rem)] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-xl animate-zoom-in sm:max-h-[calc(100dvh-3rem)] sm:rounded-xl">
             <div class="flex items-center justify-between px-6 pt-6">
                 <div>
                     <h3 class="text-xl font-black uppercase tracking-tight text-slate-900 dark:text-white">Initialize New Operation</h3>
                     <p class="text-sm font-semibold text-slate-500">Formally register a new official task.</p>
                 </div>
-                <button type="button" @click="createDialogOpen = false" class="touch-target inline-flex items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted" aria-label="Close create task dialog">
+                <button type="button" @click="createDialogOpen = false" :disabled="createSaving || uploading" class="touch-target inline-flex items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted" aria-label="Close create task dialog">
                     <x-icon name="x" class="h-5 w-5" />
                 </button>
             </div>
 
-            <div class="flex-1 space-y-5 overflow-y-auto px-6 pb-6 pt-6">
+            <form @submit.prevent="submitCreate()" class="flex min-h-0 flex-1 flex-col">
+            <div class="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-5 pb-6 pt-5 [-webkit-overflow-scrolling:touch] sm:px-6 sm:pt-6">
+                <div x-show="createError" x-cloak role="alert" class="rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm font-semibold text-destructive" x-text="createError"></div>
                 <div class="space-y-2">
                     <label class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Formal Title</label>
                     <input type="text" x-data="thaanaInput()" @input="autoTag" x-model="createForm.title" placeholder="e.g. Emergency Medical Supply Delivery" class="input h-11 w-full rounded-md border-slate-200 bg-slate-50 font-bold dark:border-slate-700 dark:bg-slate-800">
@@ -388,7 +391,16 @@
                 </div>
 
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div class="space-y-2">
+                    <div x-show="userRole === 'staff' && islands.length === 1" class="space-y-2 sm:col-span-2">
+                        <label class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Assigned hospital</label>
+                        <div class="flex min-h-11 items-center gap-3 rounded-md border border-primary/20 bg-primary/5 px-3.5 text-sm font-bold text-foreground">
+                            <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><x-icon name="building-2" class="h-4 w-4" /></span>
+                            <span x-text="assignedFacilityLabel()"></span>
+                            <span class="ml-auto rounded-full bg-primary/10 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-primary">Assigned</span>
+                        </div>
+                        <p class="text-xs font-medium text-muted-foreground">Staff tasks are restricted to this assigned hospital.</p>
+                    </div>
+                    <div x-show="userRole !== 'staff' || islands.length !== 1" class="space-y-2">
                         <label class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Atoll</label>
                         <select x-model="createForm.atoll_id" @change="createForm.island_id = ''" class="select-trigger h-11 w-full rounded-md border-slate-200 bg-slate-50 font-bold dark:border-slate-700 dark:bg-slate-800">
                             <option value="">Select Atoll...</option>
@@ -397,7 +409,7 @@
                             </template>
                         </select>
                     </div>
-                    <div class="space-y-2">
+                    <div x-show="userRole !== 'staff' || islands.length !== 1" class="space-y-2">
                         <label class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Island</label>
                         <select x-model="createForm.island_id" class="select-trigger h-11 w-full rounded-md border-slate-200 bg-slate-50 font-bold dark:border-slate-700 dark:bg-slate-800" :disabled="!createForm.atoll_id">
                             <option value="">Select Island...</option>
@@ -441,7 +453,7 @@
                             <span class="flex items-center gap-3"><span class="premium-date-icon"><x-icon name="calendar" class="h-4 w-4" /></span><span class="text-left"><span class="block text-[11px] font-semibold text-muted-foreground">Select deadline</span><span class="block text-sm font-bold" :class="createForm.due_date ? 'text-foreground' : 'text-muted-foreground'" x-text="calendarDateLabel()"></span></span></span>
                             <x-icon name="chevron-down" class="h-4 w-4 text-muted-foreground transition-transform duration-200" x-bind:class="calendarOpen ? 'rotate-180' : ''" />
                         </button>
-                        <div x-show="calendarOpen" x-cloak x-transition.origin.bottom class="premium-calendar absolute bottom-full left-0 z-40 mb-2 w-full min-w-[300px] p-4 sm:w-[340px]" role="dialog" aria-label="Choose task deadline">
+                        <div x-show="calendarOpen" x-cloak x-transition.origin.top class="premium-calendar mt-2 w-full p-4 sm:absolute sm:bottom-full sm:left-0 sm:z-40 sm:mb-2 sm:mt-0 sm:w-[340px]" role="dialog" aria-label="Choose task deadline">
                             <div class="flex items-center justify-between">
                                 <button type="button" @click="changeCalendarMonth(-1)" class="premium-calendar-nav" aria-label="Previous month"><x-icon name="chevron-left" class="h-4 w-4" /></button>
                                 <div class="text-center"><p class="text-sm font-black" x-text="calendarMonthLabel()"></p><button type="button" @click="goCalendarToday()" class="mt-0.5 text-[11px] font-semibold text-primary hover:underline">Today</button></div>
@@ -495,22 +507,24 @@
                 </div>
             </div>
 
-            <div class="flex shrink-0 justify-end gap-2 border-t border-border/60 px-6 py-4">
-                <button type="button" @click="createDialogOpen = false" class="h-11 rounded-md px-4 text-xs font-bold uppercase tracking-widest text-slate-600 transition-colors hover:bg-muted dark:text-slate-300">
+            <div class="safe-bottom grid shrink-0 grid-cols-2 gap-2 border-t border-border/60 px-4 py-3 sm:flex sm:justify-end sm:px-6 sm:py-4">
+                <button type="button" @click="createDialogOpen = false" :disabled="createSaving || uploading" class="h-11 rounded-md px-3 text-xs font-bold uppercase tracking-widest text-slate-600 transition-colors hover:bg-muted dark:text-slate-300 sm:px-4">
                     Discard Entry
                 </button>
-                <button type="button" @click="submitCreate()" :disabled="uploading || !createForm.title.trim()" class="inline-flex h-11 items-center gap-2 rounded-md bg-primary px-5 text-xs font-black uppercase tracking-widest text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50">
-                    <x-icon name="loader-2" x-show="uploading" class="h-4 w-4 animate-spin" />
-                    Finalize
+                <button type="submit" :disabled="uploading || createSaving" class="inline-flex h-11 min-w-[8.5rem] items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary px-3 text-xs font-black uppercase tracking-widest text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 sm:px-5">
+                    <x-icon name="loader-2" x-show="uploading || createSaving" x-cloak class="h-4 w-4 animate-spin" />
+                    <span>Add task</span>
                 </button>
             </div>
+            </form>
         </div>
     </div>
+    </template>
 
     {{-- System archive dialog --}}
     <div class="fixed inset-0 z-50 flex items-center justify-center p-4" x-show="archiveDialogOpen" x-cloak role="dialog" aria-modal="true" aria-label="Task archive">
-        <div class="absolute inset-0 bg-black/60"></div>
-        <div class="relative z-10 w-full max-w-lg overflow-hidden rounded-xl border border-border bg-card shadow-xl animate-zoom-in">
+        <button type="button" class="absolute inset-0 bg-black/60" @click="archiveDialogOpen = false" aria-label="Close task archive"></button>
+        <div class="relative z-10 max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-hidden rounded-xl border border-border bg-card shadow-xl animate-zoom-in">
             <div class="flex items-center justify-between border-b border-border px-6 py-4">
                 <div>
                     <h3 class="text-xl font-black uppercase tracking-tight text-slate-900 dark:text-white">System Archive</h3>

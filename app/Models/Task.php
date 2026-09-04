@@ -34,10 +34,6 @@ class Task extends Model
         'island_id' => 'string',
     ];
 
-    public const STATUSES = ['pending', 'in_progress', 'completed', 'cancelled'];
-
-    public const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
-
     public function assignor(): BelongsTo
     {
         return $this->belongsTo(Profile::class, 'assigned_by');
@@ -78,11 +74,6 @@ class Task extends Model
         return $this->due_date
             && $this->status !== 'completed'
             && strtotime($this->due_date) < strtotime('today');
-    }
-
-    public function scopeNotArchived($query)
-    {
-        return $query->where('archived', false);
     }
 
     protected static function booted(): void

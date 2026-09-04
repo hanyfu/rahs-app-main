@@ -1,6 +1,7 @@
 <div
     x-data='taskCard(task, { profiles: @json($profiles), assignableProfiles: @json($assignableProfiles), islands: @json($islands), atolls: @json($atolls), departments: @json($departments), userRole: @json($userRole), currentUserId: @json($currentUserId) })'
     class="group relative flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-md"
+    @keydown.escape.window="closeDialogs()"
     :class="isOverdue ? 'border-rose-300 bg-rose-50/50 dark:border-rose-900 dark:bg-rose-950/20' : (isDueSoon ? 'border-orange-300 bg-orange-50/50 dark:border-orange-900 dark:bg-orange-950/20' : '')"
 >
     {{-- Official Accent --}}
@@ -75,7 +76,10 @@
             <div class="flex min-w-[160px] shrink-0 flex-col justify-center gap-3 border-t border-slate-100 bg-slate-50/50 p-5 dark:border-slate-800 dark:bg-slate-800/30 sm:border-l sm:border-t-0">
                 <template x-if="createdByProfile">
                     <div class="flex w-full items-center gap-3">
-                        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-xs font-bold text-muted-foreground dark:border-slate-700 dark:bg-slate-800" x-text="initials(createdByProfile)"></div>
+                        <div class="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800">
+                            <template x-if="createdByProfile.avatar_url"><img :src="createdByProfile.avatar_url" :alt="createdByProfile.first_name + ' avatar'" class="h-full w-full object-cover"></template>
+                            <template x-if="!createdByProfile.avatar_url"><span class="flex h-full w-full items-center justify-center text-xs font-bold text-muted-foreground" x-text="initials(createdByProfile)"></span></template>
+                        </div>
                         <div class="flex flex-col overflow-hidden">
                             <span class="text-[9px] font-black uppercase tracking-widest text-slate-400">Created by</span>
                             <span class="truncate text-[11px] font-bold text-slate-700 dark:text-slate-200" x-text="createdByProfile.first_name + ' ' + createdByProfile.last_name"></span>
@@ -84,7 +88,10 @@
                 </template>
                 <template x-if="assignedToProfile">
                     <div class="flex w-full items-center gap-3">
-                        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-100 font-bold text-primary shadow-sm transition-transform duration-300 group-hover:scale-105 dark:border-slate-700 dark:bg-slate-800" x-text="initials(assignedToProfile)"></div>
+                        <div class="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-slate-200 bg-slate-100 font-bold text-primary shadow-sm transition-transform duration-300 group-hover:scale-105 dark:border-slate-700 dark:bg-slate-800">
+                            <template x-if="assignedToProfile.avatar_url"><img :src="assignedToProfile.avatar_url" :alt="assignedToProfile.first_name + ' avatar'" class="h-full w-full object-cover"></template>
+                            <template x-if="!assignedToProfile.avatar_url"><span class="flex h-full w-full items-center justify-center" x-text="initials(assignedToProfile)"></span></template>
+                        </div>
                         <div class="flex flex-col overflow-hidden">
                             <span class="text-[9px] font-black uppercase tracking-widest text-slate-400">Assignee</span>
                             <span class="truncate text-[11px] font-bold text-slate-700 dark:text-slate-200" x-text="assignedToProfile.first_name + ' ' + assignedToProfile.last_name"></span>
@@ -171,9 +178,9 @@
     </div>
 
     {{-- Status update dialog --}}
-    <div class="fixed inset-0 z-50 flex items-center justify-center p-4" x-show="statusDialogOpen" x-cloak role="dialog" aria-modal="true" aria-label="Update task status">
-        <div class="absolute inset-0 bg-black/60"></div>
-        <div class="relative z-10 w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl animate-zoom-in">
+    <div class="mobile-dialog fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4" x-show="statusDialogOpen" x-cloak @keydown.escape.window="statusDialogOpen && closeDialogs()" role="dialog" aria-modal="true" aria-label="Update task status">
+        <button type="button" class="absolute inset-0 bg-black/60" @click="closeDialogs()" aria-label="Cancel status update"></button>
+        <div class="mobile-dialog-panel relative z-10 max-h-[calc(100dvh-0.5rem)] w-full max-w-md overflow-y-auto overscroll-contain rounded-t-2xl border border-border bg-card p-5 shadow-xl animate-zoom-in sm:max-h-[calc(100dvh-2rem)] sm:rounded-xl sm:p-6">
             <h3 class="text-xl font-black uppercase tracking-tight text-slate-900 dark:text-white">Status Update</h3>
             <p class="text-sm font-semibold text-slate-500">Log the current progress of this official task.</p>
             <div class="space-y-5 py-4">
@@ -193,16 +200,14 @@
                     </div>
                 </template>
             </div>
-            <button type="button" @click="confirmStatusUpdate()" class="h-11 w-full rounded-md bg-primary text-xs font-black uppercase tracking-widest text-white transition-colors hover:bg-primary/90">
-                Confirm Updates
-            </button>
+            <div class="grid grid-cols-2 gap-3"><button type="button" @click="closeDialogs()" :disabled="statusSaving" class="h-11 rounded-md border border-border bg-background text-xs font-black uppercase tracking-widest text-slate-600 hover:bg-muted dark:text-slate-300">Cancel</button><button type="button" @click="confirmStatusUpdate()" :disabled="statusSaving" class="h-11 rounded-md bg-primary text-xs font-black uppercase tracking-widest text-white transition-colors hover:bg-primary/90 disabled:cursor-wait disabled:opacity-60" x-text="statusSaving ? 'Updating…' : 'Update status'"></button></div>
         </div>
     </div>
 
     {{-- Reassign dialog --}}
-    <div class="fixed inset-0 z-50 flex items-center justify-center p-4" x-show="reassignDialogOpen" x-cloak role="dialog" aria-modal="true" aria-label="Reassign task">
-        <div class="absolute inset-0 bg-black/60" @click="closeReassign()"></div>
-        <div class="relative z-10 w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl animate-zoom-in">
+    <div class="mobile-dialog fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4" x-show="reassignDialogOpen" x-cloak role="dialog" aria-modal="true" aria-label="Reassign task">
+        <button type="button" class="absolute inset-0 bg-black/60" @click="closeReassign()" aria-label="Cancel task reassignment"></button>
+        <div class="mobile-dialog-panel relative z-10 max-h-[calc(100dvh-0.5rem)] w-full max-w-md overflow-y-auto overscroll-contain rounded-t-2xl border border-border bg-card p-5 shadow-xl animate-zoom-in sm:max-h-[calc(100dvh-2rem)] sm:rounded-xl sm:p-6">
             <h3 class="text-xl font-black uppercase tracking-tight text-slate-900 dark:text-white">Hand Over Responsibility</h3>
             <p class="text-sm font-semibold text-slate-500">Transfer this official task to another authorized member.</p>
             <div class="space-y-6 py-4">
@@ -228,9 +233,9 @@
     </div>
 
     {{-- Edit dialog --}}
-    <div class="fixed inset-0 z-50 flex items-center justify-center p-4" x-show="editDialogOpen" x-cloak role="dialog" aria-modal="true" aria-label="Edit task">
-        <div class="absolute inset-0 bg-black/60"></div>
-        <div class="relative z-10 w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-xl animate-zoom-in">
+    <div class="mobile-dialog fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4" x-show="editDialogOpen" x-cloak role="dialog" aria-modal="true" aria-label="Edit task">
+        <button type="button" class="absolute inset-0 bg-black/60" @click="closeDialogs()" aria-label="Cancel task editing"></button>
+        <div class="mobile-dialog-panel relative z-10 max-h-[calc(100dvh-0.5rem)] w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-2xl border border-border bg-card p-5 shadow-xl animate-zoom-in sm:max-h-[calc(100dvh-2rem)] sm:rounded-xl sm:p-6">
             <h3 class="text-xl font-black uppercase tracking-tight text-slate-900 dark:text-white">Modify Task Records</h3>
             <p class="text-sm font-semibold text-slate-500">Update the formal details of this official record.</p>
             <div class="space-y-4 py-4">
@@ -267,16 +272,14 @@
                     </div>
                 </div>
             </div>
-            <button type="button" @click="confirmEdit()" class="h-11 w-full rounded-md bg-primary text-xs font-black uppercase tracking-widest text-white transition-colors hover:bg-primary/90">
-                Save Formal Changes
-            </button>
+            <div class="grid grid-cols-2 gap-3"><button type="button" @click="closeDialogs()" class="h-11 rounded-md border border-border bg-background text-xs font-black uppercase tracking-widest text-slate-600 hover:bg-muted dark:text-slate-300">Cancel</button><button type="button" @click="confirmEdit()" class="h-11 rounded-md bg-primary text-xs font-black uppercase tracking-widest text-white transition-colors hover:bg-primary/90">Save changes</button></div>
         </div>
     </div>
 
     {{-- Delete confirm dialog --}}
-    <div class="fixed inset-0 z-50 flex items-center justify-center p-4" x-show="deleteDialogOpen" x-cloak role="alertdialog" aria-modal="true" aria-label="Delete task">
-        <div class="absolute inset-0 bg-black/60"></div>
-        <div class="relative z-10 w-full max-w-md rounded-xl border border-destructive/25 bg-card p-6 shadow-xl animate-zoom-in">
+    <div class="mobile-dialog fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4" x-show="deleteDialogOpen" x-cloak role="alertdialog" aria-modal="true" aria-label="Delete task">
+        <button type="button" class="absolute inset-0 bg-black/60" @click="closeDialogs()" aria-label="Cancel task deletion"></button>
+        <div class="mobile-dialog-panel relative z-10 max-h-[calc(100dvh-0.5rem)] w-full max-w-md overflow-y-auto overscroll-contain rounded-t-2xl border border-destructive/25 bg-card p-5 shadow-xl animate-zoom-in sm:max-h-[calc(100dvh-2rem)] sm:rounded-xl sm:p-6">
             <h3 class="text-xl font-black uppercase tracking-tight text-rose-600">Authorize Deletion?</h3>
             <p class="mt-2 text-sm font-semibold text-slate-600 dark:text-slate-400">
                 This action will permanently purge this record and all associated data from the portal database.
